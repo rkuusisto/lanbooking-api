@@ -190,7 +190,7 @@ class BookingService {
 
   createAccount(email, callback) {
     var connection = azureSqlConnection.connect();
-    var code = `aslan${this.makeCode()}`;
+    var code = `tammilanit${this.makeCode()}`;
 
     // Attempt to connect and execute queries if connection goes through
     connection.on('connect', connErr => {
@@ -289,7 +289,7 @@ class BookingService {
   createBookingMessage(email, code) {
     return {
       to: email,
-      from: 'aslan@aslan.fi',
+      from: 'ikovaa@gmail.com',
       templateId: config.SG_BOOKING_TEMPLATE_ID,
       dynamic_template_data: {
         email: email,
@@ -301,10 +301,10 @@ class BookingService {
   createInvitationMessage(emails) {
     return {
       to: emails,
-      from: 'aslan@aslan.fi',
+      from: 'uikovaa@gmail.com',
       templateId: config.SG_INVITE_TEMPLATE_ID,
       dynamic_template_data: {
-        date: '19.-21.10.2023',
+        date: '19.-21.01.2024',
       },
     };
   }
