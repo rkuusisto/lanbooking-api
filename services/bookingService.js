@@ -289,7 +289,7 @@ class BookingService {
   createBookingMessage(email, code) {
     return {
       to: email,
-      from: 'ikovaa@gmail.com',
+      from: 'tammilanit@datactor.fi',
       templateId: config.SG_BOOKING_TEMPLATE_ID,
       dynamic_template_data: {
         email: email,
@@ -301,7 +301,7 @@ class BookingService {
   createInvitationMessage(emails) {
     return {
       to: emails,
-      from: 'uikovaa@gmail.com',
+      from: 'tammilanit@datactor.fi',
       templateId: config.SG_INVITE_TEMPLATE_ID,
       dynamic_template_data: {
         date: '19.-21.01.2024',
