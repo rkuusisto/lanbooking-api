@@ -1,4 +1,4 @@
-FROM node:18 as base
+FROM node:18
 # Create app directory
 WORKDIR /usr/src/app
 
@@ -7,19 +7,14 @@ WORKDIR /usr/src/app
 # where available (npm@5+)
 COPY package*.json ./
 RUN npm install
-# RUN npm ci
+RUN npm run build
+#RUN npm ci
 # If you are building your code for production
-# RUN npm ci --omit=dev
+#RUN npm ci --omit=dev
 
 # Bundle app source
 COPY . .
 
-EXPOSE 3000
+EXPOSE 4000
 
-CMD [ "npm", "start" ]
-
-FROM base as production
-
-ENV NODE_PATH=./build
-
-RUN npm run build
+CMD [ "node", "dist/app.js"]
