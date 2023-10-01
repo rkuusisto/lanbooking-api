@@ -18,14 +18,14 @@ class RegistrationService {
                                     [AttendingThu],[AttendingFri],
                                     [TournamentBS],[TournamentOW],[TournamentLOL],[TournamentMC],[TournamentCS],[TournamentTetris],
                                     [TournamentTableFB],[TournamentTableTennis],[TournamentBiljard],[TournamentOther],[TournamentOtherComment],
-                                    [Food],[Diet],[DietL],[DietG],[DietV],[DietOther],[DietOtherComment])
+                                    [Food],[Diet],[DietL],[DietG],[DietV],[DietOther],[DietOtherComment],[Nickname],[SteamID])
                             VALUES
                                     (@firstname,@lastname,@phone,@email,@parentName,@parentPhone,
                                     @devicePC,@deviceConsole,@deviceHanging,@deviceOther,@deviceOtherComment,
                                     @attendingThu,@attendingFri,
                                     @tournamentBS,@tournamentOW,@tournamentLOL,@tournamentMC,@tournamentCS,@tournamentTetris,
                                     @tournamentTableFB,@tournamentTableTennis,@tournamentBiljard,@tournamentOther,@tournamentOtherComment,
-                                    @food,@diet,@dietL,@dietG,@dietV,@dietOther,@dietOtherComment);
+                                    @food,@diet,@dietL,@dietG,@dietV,@dietOther,@dietOtherComment,@nickname,@steamId);
                             SELECT @@identity`;
 
                 var request = new Request(query,
@@ -75,6 +75,8 @@ class RegistrationService {
                 request.addParameter('dietV', TYPES.TinyInt, model.ruokaVegaani);
                 request.addParameter('dietOther', TYPES.TinyInt, model.ruokaMuu);
                 request.addParameter('dietOtherComment', TYPES.NVarChar, model.ruokaMuuKommentti);
+                request.addParameter('nickname', TYPES.NVarChar, model.nickname);
+                request.addParameter('steamId', TYPES.NVarChar, model.steamId);
 
                 connection.execSql(request);
             }
