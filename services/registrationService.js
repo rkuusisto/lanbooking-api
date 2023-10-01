@@ -18,14 +18,14 @@ class RegistrationService {
                                     [AttendingThu],[AttendingFri],
                                     [TournamentBS],[TournamentOW],[TournamentLOL],[TournamentMC],[TournamentCS],[TournamentTetris],
                                     [TournamentTableFB],[TournamentTableTennis],[TournamentBiljard],[TournamentOther],[TournamentOtherComment],
-                                    [Food],[Diet],[DietL],[DietG],[DietV],[DietOther],[DietOtherComment],[Nickname],[SteamID])
+                                    [Food],[Diet],[DietL],[DietG],[DietV],[DietOther],[DietOtherComment],[Nickname],[SteamID],[Feedback])
                             VALUES
                                     (@firstname,@lastname,@phone,@email,@parentName,@parentPhone,
                                     @devicePC,@deviceConsole,@deviceHanging,@deviceOther,@deviceOtherComment,
                                     @attendingThu,@attendingFri,
                                     @tournamentBS,@tournamentOW,@tournamentLOL,@tournamentMC,@tournamentCS,@tournamentTetris,
                                     @tournamentTableFB,@tournamentTableTennis,@tournamentBiljard,@tournamentOther,@tournamentOtherComment,
-                                    @food,@diet,@dietL,@dietG,@dietV,@dietOther,@dietOtherComment,@nickname,@steamId);
+                                    @food,@diet,@dietL,@dietG,@dietV,@dietOther,@dietOtherComment,@nickname,@steamId,@feedback);
                             SELECT @@identity`;
 
                 var request = new Request(query,
@@ -77,6 +77,7 @@ class RegistrationService {
                 request.addParameter('dietOtherComment', TYPES.NVarChar, model.ruokaMuuKommentti);
                 request.addParameter('nickname', TYPES.NVarChar, model.nickname);
                 request.addParameter('steamId', TYPES.NVarChar, model.steamId);
+                request.addParameter('feedback', TYPES.NVarChar, model.feedback);
 
                 connection.execSql(request);
             }
