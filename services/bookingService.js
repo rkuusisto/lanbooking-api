@@ -289,7 +289,7 @@ class BookingService {
   createBookingMessage(email, code) {
     return {
       to: email,
-      from: 'info@tammilan.it',
+      from: 'Tammilanit <info@tammilan.it>',
       templateId: config.SG_BOOKING_TEMPLATE_ID,
       dynamic_template_data: {
         email: email,
@@ -301,7 +301,7 @@ class BookingService {
   createInvitationMessage(emails) {
     return {
       to: emails,
-      from: 'info@tammilan.it',
+      from: 'Tammilanit <info@tammilan.it>',
       templateId: config.SG_INVITE_TEMPLATE_ID,
       dynamic_template_data: {
         date: '17.-19.01.2025',
