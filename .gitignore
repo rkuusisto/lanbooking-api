@@ -104,3 +104,5 @@ dist
 .tern-port
 dist/
 sendgrid.cmd
+
+package-lock.json
