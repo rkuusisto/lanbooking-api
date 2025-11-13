@@ -104,7 +104,3 @@ dist
 .tern-port
 dist/
 sendgrid.cmd
-
-
-
-.idea_bak/
