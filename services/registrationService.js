@@ -80,6 +80,9 @@ class RegistrationService {
                 request.addParameter('feedback', TYPES.NVarChar, model.feedback);
 
                 connection.execSql(request);
+                connection.on('requestCompleted', function () {
+                    connection.close();
+                });
             }
         });
 
@@ -106,6 +109,9 @@ class RegistrationService {
                         request.addParameter('email', TYPES.NVarChar, email);
 
                 connection.execSql(request);
+                connection.on('requestCompleted', function () {
+                    connection.close();
+                });
             }
         });
 
@@ -142,6 +148,9 @@ class RegistrationService {
                         });
 
                 connection.execSql(request);
+                connection.on('requestCompleted', function () {
+                    connection.close();
+                });
             }
         });
 
@@ -174,6 +183,9 @@ class RegistrationService {
                         });
 
                 connection.execSql(request);
+                connection.on('requestCompleted', function () {
+                    connection.close();
+                });
             }
         });
 

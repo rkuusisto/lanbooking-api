@@ -5,18 +5,17 @@ import logger from 'morgan';
 import cookieParser from 'cookie-parser';
 import createError from 'http-errors';
 import http from 'http';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import {fileURLToPath} from 'url';
+import {dirname} from 'path';
 
 import indexRouter from './routes/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import lanbookingRouter from './routes/lanbooking.js';
 import lanregistrationRouter from './routes/lanregistration.js';
 import lanFeedbackRouter from './routes/lanfeedback.js';
 import lanTodoRouter from './routes/lantodo.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
 
 let app = express();
 

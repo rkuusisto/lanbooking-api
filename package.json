@@ -2,6 +2,7 @@
   "name": "lanbooking-api",
   "type": "module",
   "version": "1.0.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "start": "node app.js",

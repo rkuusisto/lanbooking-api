@@ -10,6 +10,8 @@ class BookingService {
     connection.on('connect', connErr => {
       if (connErr) {
         console.log(connErr);
+          connection.close();
+          callback({error: 'connection error'});
       } else {
         var request = new Request(
           'SELECT Location FROM [Lanbooking] WHERE Email = @email AND Code = @code',
@@ -17,11 +19,13 @@ class BookingService {
             if (err) {
               console.error('request error:');
               console.log(err);
-              callback({ error: 'request error' });
-              return;
+                connection.close();
+                callback({error: 'request error'});
+                return;
             }
 
-            if (rowCount === 0) {
+              connection.close();
+              if (rowCount === 0) {
               callback(null);
             } else {
               rows[0][0].value == null
@@ -48,6 +52,8 @@ class BookingService {
     connection.on('connect', connErr => {
       if (connErr) {
         console.log(connErr);
+          connection.close();
+          callback({error: 'connection error'});
       } else {
         // Read all rows from table
         var request = new Request(
@@ -56,11 +62,13 @@ class BookingService {
             if (err) {
               console.error('request error:');
               console.log(err);
-              callback({ error: 'request error' });
-              return;
+                connection.close();
+                callback({error: 'request error'});
+                return;
             }
-            console.log('rowcount r: ' + rowCount);
-            if (rowCount === 0) {
+              console.log('rowcount r: ' + rowCount);
+              connection.close();
+              if (rowCount === 0) {
               callback({ error: 'no result' });
             } else {
               callback(rowCount);
@@ -93,6 +101,8 @@ class BookingService {
     connection.on('connect', connErr => {
       if (connErr) {
         console.log(connErr);
+          connection.close();
+          callback({error: 'connection error'});
       } else {
         var request = new Request(
           'SELECT * FROM [Lanbooking] WHERE Location = @location',
@@ -124,6 +134,8 @@ class BookingService {
     connection.on('connect', connErr => {
       if (connErr) {
         console.log(connErr);
+          connection.close();
+          callback({error: 'connection error'});
       } else {
         // Read all rows from table
         var request = new Request(
@@ -339,6 +351,101 @@ class BookingService {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
 
     return text;
+  }
+
+  getSettings(callback) {
+    var connection = azureSqlConnection.connect();
+
+    connection.on('connect', connErr => {
+      if (connErr) {
+        console.log(connErr);
+        connection.close();
+        callback({ error: 'connection error' });
+      } else {
+        var request = new Request(
+          'SELECT TOP 1 total, startDate, endDate, eventName FROM [LanSettings] ORDER BY id DESC',
+          (err, rowCount, rows) => {
+            if (err) {
+              console.error('request error:');
+              console.log(err);
+              connection.close();
+              callback({ error: 'request error' });
+              return;
+            }
+
+            connection.close();
+            if (rowCount === 0) {
+              callback({ error: 'No settings found' });
+            } else {
+              const settings = {};
+              rows[0].forEach(col => {
+                if (col.metadata.colName === 'startDate' || col.metadata.colName === 'endDate') {
+                  // Format date as yyyy-mm-dd
+                  const date = new Date(col.value);
+                  settings[col.metadata.colName] = date.toISOString().split('T')[0];
+                } else {
+                  settings[col.metadata.colName] = col.value;
+                }
+              });
+              callback(settings);
+            }
+          }
+        );
+
+        connection.execSql(request);
+      }
+    });
+
+    connection.connect();
+  }
+
+  getAllTableGroups(callback) {
+    var connection = azureSqlConnection.connect();
+
+    connection.on('connect', connErr => {
+      if (connErr) {
+        console.log(connErr);
+        connection.close();
+        callback({ error: 'connection error' });
+      } else {
+        var request = new Request(
+          'SELECT * FROM [TableGroups]',
+          (err, rowCount, rows) => {
+            if (err) {
+              console.error('request error:');
+              console.log(err);
+              connection.close();
+              callback({ error: 'request error' });
+              return;
+            }
+
+            connection.close();
+            if (rowCount === 0) {
+              callback([]);
+            } else {
+              const tableGroups = rows.map(row => {
+                const group = {};
+                row.forEach(col => {
+                  if (col.value !== null) {
+                    if (col.metadata.colName === 'style') {
+                      group[col.metadata.colName] = JSON.parse(col.value);
+                    } else {
+                      group[col.metadata.colName] = col.value;
+                    }
+                  }
+                });
+                return group;
+              });
+              callback(tableGroups);
+            }
+          }
+        );
+
+        connection.execSql(request);
+      }
+    });
+
+    connection.connect();
   }
 }
 

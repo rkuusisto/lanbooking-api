@@ -73,6 +73,24 @@ router
     } else {
       sendFailure('unauthorized', res);
     }
+  })
+  .get('/settings', (req, res) => {
+    service.getSettings(data => {
+      if (data.error) {
+        sendFailure('error in query', res);
+      } else {
+        res.json(data);
+      }
+    });
+  })
+  .get('/tablegroups', (req, res) => {
+    service.getAllTableGroups(data => {
+      if (data.error) {
+        sendFailure('error in query', res);
+      } else {
+        res.json(data);
+      }
+    });
   });
 
 export default router;
