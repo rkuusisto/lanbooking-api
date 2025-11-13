@@ -1,5 +1,5 @@
 import { Connection, ISOLATION_LEVEL } from 'tedious';
-import config from '../config/config';
+import config from '../config/config.js';
 
 class AzureSqlConnection {
     connect() {
