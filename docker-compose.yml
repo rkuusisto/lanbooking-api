@@ -1,15 +1,12 @@
-version: '3.8'
-
 services:
-  app:
-    image: node:18
-    working_dir: /usr/src/app
-    volumes:
-      - .:/usr/src/app
-    ports:
-      - "4000:4000"
-    command: ["npm", "start"]
+  api:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: lanbooking-api
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
     restart: unless-stopped
+
