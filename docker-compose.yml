@@ -8,5 +8,13 @@ services:
       - "4000:4000"
     environment:
       - NODE_ENV=production
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SG_BOOKING_TEMPLATE_ID=${SG_BOOKING_TEMPLATE_ID}
+      - SG_INVITE_TEMPLATE_ID=${SG_INVITE_TEMPLATE_ID}
+      - INVITE_SECRET=${INVITE_SECRET}
     restart: unless-stopped
 
