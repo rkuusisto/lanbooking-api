@@ -1,0 +1,70 @@
+{
+  "realm": "lanbooking",
+  "enabled": true,
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "resetPasswordAllowed": true,
+  "clients": [
+    {
+      "clientId": "lanbooking-api",
+      "name": "LAN Booking API",
+      "description": "Bearer-only resource server for the intranet",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone"
+      ],
+      "secret": "CHANGE_ME"
+    },
+    {
+      "clientId": "lanbooking-frontend",
+      "name": "LAN Booking Intra Frontend",
+      "description": "PKCE-enabled SPA client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "intra-admin",
+        "description": "Grants access to LAN intra API endpoints",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  }
+}

@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   api:
     build:
@@ -16,5 +18,47 @@ services:
       - SG_BOOKING_TEMPLATE_ID=${SG_BOOKING_TEMPLATE_ID}
       - SG_INVITE_TEMPLATE_ID=${SG_INVITE_TEMPLATE_ID}
       - INVITE_SECRET=${INVITE_SECRET}
+      - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-http://keycloak:8080}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-lanbooking}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
+      - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
+      - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
+    depends_on:
+      - keycloak
     restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: lanbooking-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_DB=postgres
+      - KC_DB_USERNAME=${KEYCLOAK_DB_USER:-keycloak}
+      - KC_DB_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+      - KC_DB_URL_DATABASE=${KEYCLOAK_DB_NAME:-keycloak}
+      - KC_DB_URL_HOST=keycloak-db
+      - KC_PROXY=edge
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    depends_on:
+      - keycloak-db
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: lanbooking-keycloak-db
+    environment:
+      - POSTGRES_DB=${KEYCLOAK_DB_NAME:-keycloak}
+      - POSTGRES_USER=${KEYCLOAK_DB_USER:-keycloak}
+      - POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+    volumes:
+      - keycloak-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  keycloak-data:
 
