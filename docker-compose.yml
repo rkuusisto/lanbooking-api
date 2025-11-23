@@ -30,7 +30,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
     container_name: lanbooking-keycloak
-    command: ["start-dev", "--import-realm"]
+    command: ["start", "--optimized", "--import-realm"]
     environment:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -40,10 +40,18 @@ services:
       - KC_DB_URL_DATABASE=${KEYCLOAK_DB_NAME:-keycloak}
       - KC_DB_URL_HOST=keycloak-db
       - KC_PROXY=edge
+      - KC_HOSTNAME=${KEYCLOAK_HOSTNAME}
+      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT:-true}
+      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS:-true}
+      - KC_HTTP_ENABLED=${KEYCLOAK_HTTP_ENABLED:-false}
+      - KC_HTTPS_PORT=${KEYCLOAK_HTTPS_PORT:-8443}
+      - KC_HTTP_PORT=${KEYCLOAK_HTTP_PORT:-8080}
     ports:
-      - "8080:8080"
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
+      - "${KEYCLOAK_HTTPS_PORT:-8443}:8443"
     volumes:
       - ./keycloak:/opt/keycloak/data/import
+      - keycloak-server-data:/opt/keycloak/data
     depends_on:
       - keycloak-db
     restart: unless-stopped
@@ -61,4 +69,5 @@ services:
 
 volumes:
   keycloak-data:
+  keycloak-server-data:
 

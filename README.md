@@ -10,6 +10,8 @@ Node.js Express REST API for LAN bookings with SendGrid notifications and Azure 
 
 Set the following environment variables before starting the API (e.g. via `.env` or the container runtime):
 
+> **Production Setup:** See [`env.production.example`](env.production.example) for a complete production environment template. Copy it to `.env` on your production server and fill in all values.
+
 | Variable | Description |
 | --- | --- |
 | `DB_HOST` | Database host name |
@@ -27,6 +29,31 @@ Set the following environment variables before starting the API (e.g. via `.env`
 | `KEYCLOAK_REQUIRED_ROLE` | Realm/client role required to call intra endpoints (`intra-admin` recommended) |
 
 The API fails fast if the Keycloak variables are missing, ensuring intra routes always remain protected.
+
+### Keycloak Production Configuration
+
+For production deployments, configure the following additional environment variables:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `KEYCLOAK_HOSTNAME` | Hostname for Keycloak (e.g. `auth.example.com`) | Required in production |
+| `KEYCLOAK_HOSTNAME_STRICT` | Enforce strict hostname checking | `true` |
+| `KEYCLOAK_HOSTNAME_STRICT_HTTPS` | Enforce HTTPS for strict hostname | `true` |
+| `KEYCLOAK_HTTP_ENABLED` | Allow HTTP access (set to `false` for HTTPS-only) | `false` |
+| `KEYCLOAK_HTTPS_PORT` | HTTPS port for Keycloak | `8443` |
+| `KEYCLOAK_HTTP_PORT` | HTTP port for Keycloak | `8080` |
+| `KEYCLOAK_ADMIN` | Keycloak admin username | `admin` |
+| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password | **Must be changed in production** |
+| `KEYCLOAK_DB_USER` | Keycloak database username | `keycloak` |
+| `KEYCLOAK_DB_PASSWORD` | Keycloak database password | **Must be changed in production** |
+| `KEYCLOAK_DB_NAME` | Keycloak database name | `keycloak` |
+
+**Important for production:**
+- Keycloak runs in optimized production mode (`start --optimized`)
+- Set `KEYCLOAK_HOSTNAME` to your production domain
+- Ensure strong passwords for `KEYCLOAK_ADMIN_PASSWORD` and `KEYCLOAK_DB_PASSWORD`
+- Configure HTTPS certificates (Keycloak will auto-generate self-signed certs for testing, but use proper certificates in production)
+- Set `KEYCLOAK_BASE_URL` in the API service to use HTTPS URL in production
 
 ## Local Keycloak Stack
 
