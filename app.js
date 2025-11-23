@@ -1,4 +1,4 @@
-﻿import debug from 'debug';
+import debug from 'debug';
 import express from 'express';
 import path from 'path';
 import logger from 'morgan';
@@ -9,6 +9,8 @@ import {fileURLToPath} from 'url';
 import {dirname} from 'path';
 
 import indexRouter from './routes/index.js';
+import intraRouter from './routes/intra.js';
+import { requireAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,8 +35,12 @@ app.use(function (req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
   res.header(
     'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept'
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
   );
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
   next();
 });
 
@@ -43,6 +49,7 @@ app.use('/api/v1/lanbooking', lanbookingRouter);
 app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
+app.use('/api/v1/intra', requireAuth, intraRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
