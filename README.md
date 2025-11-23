@@ -39,9 +39,8 @@ For production deployments, configure the following additional environment varia
 | `KEYCLOAK_HOSTNAME` | Hostname for Keycloak (e.g. `auth.example.com`) | Required in production |
 | `KEYCLOAK_HOSTNAME_STRICT` | Enforce strict hostname checking | `true` |
 | `KEYCLOAK_HOSTNAME_STRICT_HTTPS` | Enforce HTTPS for strict hostname | `true` |
-| `KEYCLOAK_HTTP_ENABLED` | Allow HTTP access (set to `false` for HTTPS-only) | `false` |
-| `KEYCLOAK_HTTPS_PORT` | HTTPS port for Keycloak | `8443` |
-| `KEYCLOAK_HTTP_PORT` | HTTP port for Keycloak | `8080` |
+| `KEYCLOAK_HTTP_ENABLED` | Allow HTTP access (set to `true` when behind reverse proxy, `false` for direct HTTPS) | `true` (behind proxy) |
+| `KEYCLOAK_HTTP_PORT` | HTTP port for Keycloak (internal) | `8080` |
 | `KEYCLOAK_ADMIN` | Keycloak admin username | `admin` |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password | **Must be changed in production** |
 | `KEYCLOAK_DB_USER` | Keycloak database username | `keycloak` |
@@ -50,10 +49,16 @@ For production deployments, configure the following additional environment varia
 
 **Important for production:**
 - Keycloak runs in optimized production mode (`start --optimized`)
-- Set `KEYCLOAK_HOSTNAME` to your production domain
+- Set `KEYCLOAK_HOSTNAME` to your production domain (what end users see)
 - Ensure strong passwords for `KEYCLOAK_ADMIN_PASSWORD` and `KEYCLOAK_DB_PASSWORD`
-- Configure HTTPS certificates (Keycloak will auto-generate self-signed certs for testing, but use proper certificates in production)
 - Set `KEYCLOAK_BASE_URL` in the API service to use HTTPS URL in production
+
+**Reverse Proxy Configuration:**
+- When running behind a reverse proxy (nginx, Traefik, etc.), set `KEYCLOAK_HTTP_ENABLED=true`
+- The reverse proxy handles HTTPS termination and forwards HTTP to Keycloak internally
+- Ensure your reverse proxy forwards proper headers (X-Forwarded-For, X-Forwarded-Proto, X-Forwarded-Host)
+- `KC_PROXY=edge` tells Keycloak to trust proxy headers
+- No HTTPS port configuration needed when behind a reverse proxy
 
 ## Local Keycloak Stack
 
