@@ -14,8 +14,21 @@ if (missing.length > 0) {
 
 const normalizedBaseUrl = config.KEYCLOAK_BASE_URL.replace(/\/+$/, '');
 const issuer = `${normalizedBaseUrl}/realms/${config.KEYCLOAK_REALM}`;
-const jwksUri = `${issuer}/protocol/openid-connect/certs`;
+
+// For JWKS fetching, always use keycloak service name (works in Docker network)
+// Replace localhost with keycloak for internal Docker network access
+const jwksBaseUrl = normalizedBaseUrl.replace(/localhost/, 'keycloak');
+const jwksUri = `${jwksBaseUrl}/realms/${config.KEYCLOAK_REALM}/protocol/openid-connect/certs`;
 const remoteJwks = createRemoteJWKSet(new URL(jwksUri));
+
+// Accept tokens from both localhost (browser perspective) and keycloak (Docker internal) issuers
+const baseUrlVariants = [normalizedBaseUrl];
+if (normalizedBaseUrl.includes('keycloak')) {
+  baseUrlVariants.push(normalizedBaseUrl.replace('keycloak', 'localhost'));
+} else if (normalizedBaseUrl.includes('localhost')) {
+  baseUrlVariants.push(normalizedBaseUrl.replace('localhost', 'keycloak'));
+}
+const allowedIssuers = baseUrlVariants.map(url => `${url}/realms/${config.KEYCLOAK_REALM}`);
 
 const configuredAudiences = (config.KEYCLOAK_AUDIENCE || '')
   .split(',')
@@ -26,7 +39,7 @@ function hasRequiredRole(payload) {
   if (!config.KEYCLOAK_REQUIRED_ROLE) {
     return true;
   }
-
+  
   const realmRoles = payload?.realm_access?.roles || [];
   const clientRoles =
     payload?.resource_access?.[config.KEYCLOAK_CLIENT_ID]?.roles || [];
@@ -46,12 +59,15 @@ export async function requireAuth(req, res, next) {
   const token = authHeader.slice(7).trim();
 
   try {
-    const verifyOptions = { issuer };
-    if (configuredAudiences.length > 0) {
-      verifyOptions.audience = configuredAudiences;
-    }
+    // First verify without issuer check to get the payload
+    const { payload } = await jwtVerify(token, remoteJwks, {
+      audience: configuredAudiences.length > 0 ? configuredAudiences : undefined
+    });
 
-    const { payload } = await jwtVerify(token, remoteJwks, verifyOptions);
+    // Then validate the issuer manually to allow both localhost and keycloak
+    if (!allowedIssuers.includes(payload.iss)) {
+      return res.status(401).json({ error: 'Invalid token issuer' });
+    }
 
     if (!hasRequiredRole(payload)) {
       return res.status(403).json({ error: 'Insufficient role' });

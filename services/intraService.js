@@ -73,6 +73,8 @@ const SETTINGS_FIELDS = {
     formatter: value => (value ? value.toISOString().split('T')[0] : null),
   }),
   eventName: field('EventName', TYPES.NVarChar, { required: true }),
+  attendancePerDayEnabled: field('AttendancePerDayEnabled', TYPES.Bit, { boolean: true }),
+  foodEnabled: field('FoodEnabled', TYPES.Bit, { boolean: true }),
   createdAt: field('CreatedAt', TYPES.DateTime, {
     readOnly: true,
     formatter: value => (value ? value.toISOString() : null),
