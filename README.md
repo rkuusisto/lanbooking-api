@@ -36,9 +36,10 @@ For production deployments, configure the following additional environment varia
 
 | Variable | Description | Default |
 | --- | --- | --- |
+| `KEYCLOAK_MODE` | Keycloak mode: `"dev"` for development, `"production"` for production | `production` |
 | `KEYCLOAK_HOSTNAME` | Hostname for Keycloak (e.g. `auth.example.com`) | Required in production |
-| `KEYCLOAK_HOSTNAME_STRICT` | Enforce strict hostname checking | `true` |
-| `KEYCLOAK_HOSTNAME_STRICT_HTTPS` | Enforce HTTPS for strict hostname | `true` |
+| `KEYCLOAK_HOSTNAME_STRICT` | Enforce strict hostname checking | `true` (dev mode: `false`) |
+| `KEYCLOAK_HOSTNAME_STRICT_HTTPS` | Enforce HTTPS for strict hostname | `true` (dev mode: `false`) |
 | `KEYCLOAK_HTTP_ENABLED` | Allow HTTP access (set to `true` when behind reverse proxy, `false` for direct HTTPS) | `true` (behind proxy) |
 | `KEYCLOAK_HTTP_PORT` | HTTP port for Keycloak (internal) | `8080` |
 | `KEYCLOAK_ADMIN` | Keycloak admin username | `admin` |
@@ -47,11 +48,19 @@ For production deployments, configure the following additional environment varia
 | `KEYCLOAK_DB_PASSWORD` | Keycloak database password | **Must be changed in production** |
 | `KEYCLOAK_DB_NAME` | Keycloak database name | `keycloak` |
 
+**Development vs Production Mode:**
+- **Dev mode** (`KEYCLOAK_MODE=dev`): Uses `start-dev`, enables HTTP, disables strict hostname checking, no optimization build
+- **Production mode** (`KEYCLOAK_MODE=production`): Uses `start --optimized`, respects all security settings, optimized build for performance
+
 **Important for production:**
+- Set `KEYCLOAK_MODE=production` (or leave unset, as production is the default)
 - Keycloak runs in optimized production mode (`start --optimized`)
 - Set `KEYCLOAK_HOSTNAME` to your production domain (what end users see)
 - Ensure strong passwords for `KEYCLOAK_ADMIN_PASSWORD` and `KEYCLOAK_DB_PASSWORD`
 - Set `KEYCLOAK_BASE_URL` in the API service to use HTTPS URL in production
+
+**For local development:**
+- Set `KEYCLOAK_MODE=dev` in your local `.env` file for faster startup and relaxed security settings
 
 **Reverse Proxy Configuration:**
 - When running behind a reverse proxy (nginx, Traefik, etc.), set `KEYCLOAK_HTTP_ENABLED=true`
@@ -71,7 +80,10 @@ For production deployments, configure the following additional environment varia
 To boot everything locally:
 
 ```bash
+# Default: runs in production mode
 docker compose up --build
+
+# Or set KEYCLOAK_MODE=dev in your .env file for development mode
 ```
 
 Update the `lanbooking-api` client secret inside `keycloak/lanbooking-realm.json` before importing, or override it directly in Keycloak after the first start. Assign the `intra-admin` role to any users who should access the protected endpoints.

@@ -18,6 +18,7 @@ import lanbookingRouter from './routes/lanbooking.js';
 import lanregistrationRouter from './routes/lanregistration.js';
 import lanFeedbackRouter from './routes/lanfeedback.js';
 import lanTodoRouter from './routes/lantodo.js';
+import demosRouter from './routes/demos.js';
 
 let app = express();
 
@@ -49,6 +50,7 @@ app.use('/api/v1/lanbooking', lanbookingRouter);
 app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
+app.use('/api/v1/demos', demosRouter);
 app.use('/api/v1/intra', requireAuth, intraRouter);
 
 // catch 404 and forward to error handler

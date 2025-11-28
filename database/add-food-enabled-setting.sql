@@ -7,3 +7,4 @@ UPDATE [LanSettings]
 SET [FoodEnabled] = 1
 WHERE [FoodEnabled] IS NULL;
 
+

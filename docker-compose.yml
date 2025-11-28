@@ -23,6 +23,9 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
       - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
       - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
+      - DEMO_FILES_DIR=${DEMO_FILES_DIR:-/app/demos}
+    volumes:
+      - ${DEMO_FILES_DIR:-./demo-files}:/app/demos:ro
     depends_on:
       - keycloak
     restart: unless-stopped
@@ -30,8 +33,9 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
     container_name: lanbooking-keycloak
-    command: ["start", "--optimized", "--import-realm"]
+    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
     environment:
+      - KEYCLOAK_MODE=${KEYCLOAK_MODE:-production}
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       - KC_DB=postgres
@@ -40,15 +44,16 @@ services:
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
       - KC_PROXY=edge
       - KC_HOSTNAME=${KEYCLOAK_HOSTNAME}
-      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT:-true}
-      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS:-true}
+      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT}
+      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS}
       - KC_HTTP_ENABLED=${KEYCLOAK_HTTP_ENABLED:-true}
       - KC_HTTP_PORT=${KEYCLOAK_HTTP_PORT:-8080}
     ports:
-      - "${KEYCLOAK_HTTP_PORT:-8080}:${KEYCLOAK_HTTP_PORT:-8080}"
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
     volumes:
       - ${KEYCLOAK_REALM_DIR:-./keycloak}:/opt/keycloak/data/import
       - keycloak-server-data:/opt/keycloak/data
+      - ./keycloak-entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
     depends_on:
       - keycloak-db
     restart: unless-stopped

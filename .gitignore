@@ -109,3 +109,5 @@ sendgrid.cmd
 
 # Production Keycloak realm configuration (copy from template and configure)
 keycloak-production/lanbooking-realm.json
+
+demo-files/
