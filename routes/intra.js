@@ -1,5 +1,6 @@
 import express from 'express';
 import intraService from '../services/intraService.js';
+import demoService from '../services/demoService.js';
 
 const router = express.Router();
 
@@ -200,6 +201,47 @@ router.delete(
     const deleted = await intraService.deleteSetting(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Settings entry not found' });
+    }
+    return res.status(204).send();
+  })
+);
+
+// Demo Matches (admin operations)
+router.post(
+  '/demos/matches',
+  asyncHandler(async (req, res) => {
+    const matchData = req.body ?? {};
+    
+    // Validate required fields
+    if (!matchData.tournamentId || !matchData.team1 || !matchData.team2) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: tournamentId, team1, and team2 are required' 
+      });
+    }
+    
+    const match = await demoService.createDemoMatch(matchData);
+    res.status(201).json({ data: match });
+  })
+);
+
+router.put(
+  '/demos/matches/:id',
+  asyncHandler(async (req, res) => {
+    const matchData = req.body ?? {};
+    const match = await demoService.updateDemoMatch(req.params.id, matchData);
+    if (!match) {
+      return res.status(404).json({ error: 'Demo match not found' });
+    }
+    return res.json({ data: match });
+  })
+);
+
+router.delete(
+  '/demos/matches/:id',
+  asyncHandler(async (req, res) => {
+    const deleted = await demoService.deleteDemoMatch(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Demo match not found' });
     }
     return res.status(204).send();
   })

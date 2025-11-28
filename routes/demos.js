@@ -130,40 +130,5 @@ router.get(
   })
 );
 
-// Create new demo match
-router.post(
-  '/matches',
-  asyncHandler(async (req, res) => {
-    const matchData = req.body ?? {};
-    const match = await demoService.createDemoMatch(matchData);
-    res.status(201).json(match);
-  })
-);
-
-// Update demo match
-router.put(
-  '/matches/:id',
-  asyncHandler(async (req, res) => {
-    const matchData = req.body ?? {};
-    const match = await demoService.updateDemoMatch(req.params.id, matchData);
-    if (!match) {
-      return res.status(404).json({ error: 'Demo match not found' });
-    }
-    return res.json(match);
-  })
-);
-
-// Delete demo match
-router.delete(
-  '/matches/:id',
-  asyncHandler(async (req, res) => {
-    const deleted = await demoService.deleteDemoMatch(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: 'Demo match not found' });
-    }
-    return res.status(204).send();
-  })
-);
-
 export default router;
 
