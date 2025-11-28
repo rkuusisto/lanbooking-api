@@ -46,7 +46,7 @@ function rowToObject(row) {
 }
 
 /**
- * Format match date as dd.MM.yyyy HH:mm:ss
+ * Format match date as dd-MM-yyyy_HH-mm-ss (filename-safe format)
  * @param {string|Date} dateInput - Date to format
  * @returns {string} - Formatted date string or empty string if invalid
  */
@@ -57,7 +57,40 @@ export const formatMatchDate = (dateInput) => {
   if (isNaN(date.getTime())) return '';
   
   const pad = (n) => n.toString().padStart(2, '0');
-  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+};
+
+/**
+ * Sanitize a string for safe use in filenames
+ * Removes or replaces characters that could be dangerous in HTTP headers or filenames
+ * Note: Most filesystems have a 255-byte limit for filenames. This function enforces that limit.
+ * @param {string} str - String to sanitize
+ * @param {number} maxLength - Maximum length in characters (default: 255 for most filesystems)
+ * @returns {string} - Sanitized string, truncated to maxLength if necessary
+ */
+export const sanitizeFilenameComponent = (str, maxLength = 255) => {
+  if (!str || typeof str !== 'string') {
+    return '';
+  }
+  
+  const sanitized = str
+    // Remove control characters (0x00-0x1F, 0x7F-0x9F)
+    .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+    // Remove characters that are problematic in HTTP headers
+    .replace(/["\\]/g, '')
+    // Remove newlines and carriage returns (defense in depth)
+    .replace(/[\r\n]/g, '')
+    // Replace path separators with underscores
+    .replace(/[/\\]/g, '_')
+    // Remove other potentially dangerous characters
+    .replace(/[<>:|?*]/g, '')
+    // Trim whitespace
+    .trim()
+    // Replace multiple spaces with single space
+    .replace(/\s+/g, ' ');
+  
+  // Enforce length limit (most filesystems have a 255-byte limit)
+  return sanitized.substring(0, maxLength);
 };
 
 /**
@@ -66,42 +99,57 @@ export const formatMatchDate = (dateInput) => {
  * @returns {string} - Generated display name or filename fallback
  */
 export const generateDisplayName = (match) => {
+  // If displayName is provided, sanitize and use it
   if (match.displayName) {
-    return match.displayName;
+    const sanitized = sanitizeFilenameComponent(match.displayName);
+    if (sanitized) {
+      // Ensure .dem extension
+      return sanitized.endsWith('.dem') ? sanitized : `${sanitized}.dem`;
+    }
   }
   
+  // Generate from match data with sanitization
   if (match.teams && match.teams.length >= 2 && match.map && match.stage) {
     const teamA = match.teams[0];
     const teamB = match.teams[1];
     const formattedDate = formatMatchDate(match.playedAt);
     
-    if (formattedDate) {
-      return `${teamA.name} vs ${teamB.name} - ${match.map} - ${match.stage} - ${formattedDate}.dem`;
+    // Sanitize all components
+    const teamAName = sanitizeFilenameComponent(teamA.name) || 'Team1';
+    const teamBName = sanitizeFilenameComponent(teamB.name) || 'Team2';
+    const mapName = sanitizeFilenameComponent(match.map) || 'unknown';
+    const stageName = sanitizeFilenameComponent(match.stage) || 'match';
+    const datePart = sanitizeFilenameComponent(formattedDate);
+    
+    if (datePart) {
+      return `${teamAName} vs ${teamBName} - ${mapName} - ${stageName} - ${datePart}.dem`;
     }
-    return `${teamA.name} vs ${teamB.name} - ${match.map} - ${match.stage}.dem`;
+    return `${teamAName} vs ${teamBName} - ${mapName} - ${stageName}.dem`;
   }
   
-  return match.fileName || '';
+  // Fallback to sanitized fileName or default
+  const sanitizedFileName = sanitizeFilenameComponent(match.fileName);
+  return sanitizedFileName || 'demo.dem';
 };
 
 function serializeRow(row) {
   const raw = rowToObject(row);
   const match = {
-    id: raw.id || null,
-    tournamentId: raw.tournamentId || null,
-    event: raw.event || null,
-    stage: raw.stage || null,
-    fileName: raw.fileName || null,
-    displayName: raw.displayName || null,
-    fileSizeMB: raw.fileSizeMB || null,
-    map: raw.map || null,
-    bestOf: raw.bestOf || null,
+    id: raw.id,
+    tournamentId: raw.tournamentId ?? null,
+    event: raw.event ?? null,
+    stage: raw.stage ?? null,
+    fileName: raw.fileName,
+    displayName: raw.displayName ?? null,
+    fileSizeMB: raw.fileSizeMB ?? null,
+    map: raw.map ?? null,
+    bestOf: raw.bestOf ?? null,
     playedAt: raw.playedAt ? raw.playedAt.toISOString() : null,
     teams: raw.teams ? JSON.parse(raw.teams) : null,
     highlights: raw.highlights ? JSON.parse(raw.highlights) : undefined,
-    durationMinutes: raw.durationMinutes || undefined,
-    rounds: raw.rounds || undefined,
-    notes: raw.notes || undefined,
+    durationMinutes: raw.durationMinutes ?? undefined,
+    rounds: raw.rounds ?? undefined,
+    notes: raw.notes ?? undefined,
   };
 
   // Remove undefined fields
@@ -437,4 +485,5 @@ export default {
   getDemoData,
   formatMatchDate,
   generateDisplayName,
+  sanitizeFilenameComponent,
 };

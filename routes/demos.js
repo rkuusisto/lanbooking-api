@@ -88,12 +88,24 @@ router.get(
       // Check if file exists
       await fs.access(filePath);
       
-      // Generate display name using service helper
+      // Generate display name using service helper (already sanitized)
       const downloadFilename = demoService.generateDisplayName(match);
+      
+      // Log download attempt for auditing and debugging
+      console.log(`[${new Date().toISOString()}] INFO: Demo download - id=${id}, filename=${downloadFilename}, sourceFile=${filename}, ip=${req.ip || req.connection?.remoteAddress || 'unknown'}`);
       
       // Set appropriate headers for file download
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+      
+      // Use RFC 6266 compliant Content-Disposition header
+      // The filename is already sanitized in generateDisplayName, but we still encode it properly
+      // Using both filename (ASCII fallback) and filename* (RFC 5987 UTF-8 encoding) for best compatibility
+      const asciiFilename = downloadFilename.replace(/[^\x20-\x7E]/g, '_'); // Replace non-ASCII with underscore
+      const utf8Filename = encodeURIComponent(downloadFilename).replace(/['()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`
+      );
       
       // Send the file
       return res.sendFile(filePath);

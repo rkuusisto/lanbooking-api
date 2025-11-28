@@ -44,10 +44,12 @@ services:
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
       - KC_PROXY=edge
       - KC_HOSTNAME=${KEYCLOAK_HOSTNAME}
-      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT}
-      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS}
+      # Hostname validation settings - Set to false in development if accessing via localhost/IP
+      # In production, keep true for security (prevents host header injection attacks)
+      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT:-true}
+      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS:-true}
       - KC_HTTP_ENABLED=${KEYCLOAK_HTTP_ENABLED:-true}
-      - KC_HTTP_PORT=${KEYCLOAK_HTTP_PORT:-8080}
+      - KC_HTTP_PORT=8080
     ports:
       - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
     volumes:
