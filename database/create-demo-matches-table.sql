@@ -13,6 +13,7 @@ CREATE TABLE [DemoMatches] (
     [durationMinutes] INT, -- Optional
     [rounds] INT, -- Optional
     [notes] NVARCHAR(MAX), -- Optional
+    [displayName] NVARCHAR(255), -- Optional
     [createdAt] DATETIME DEFAULT GETDATE(),
     [updatedAt] DATETIME DEFAULT GETDATE()
 );

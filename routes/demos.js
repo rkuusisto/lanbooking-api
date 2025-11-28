@@ -46,36 +46,57 @@ router.get(
 );
 
 // Download handler for demo files
-// Supports both `/d:filename` (current frontend URL shape) and `/d/:filename`
+// Uses match ID for indirect file access (prevents path traversal) and friendly download names
 // Serves files from Docker volume mapped to DEMO_FILES_DIR (default: /app/demos)
 router.get(
-  ['/d:filename', '/d/:filename'],
+  '/d/:id',
   asyncHandler(async (req, res) => {
-    const { filename } = req.params;
+    const { id } = req.params;
 
-    if (!filename) {
-      return res.status(400).json({ error: 'Missing demo file name' });
+    if (!id) {
+      return res.status(400).json({ error: 'Missing demo match ID' });
     }
 
-    // Sanitize filename to prevent directory traversal
-    const sanitizedFilename = path.basename(filename);
-    if (!sanitizedFilename || sanitizedFilename === '.' || sanitizedFilename === '..' || sanitizedFilename !== filename) {
-      return res.status(400).json({ error: 'Invalid file name' });
+    // Sanitize ID: must be alphanumeric with underscores, hyphens, and dots
+    if (
+      typeof id !== 'string' ||
+      !/^[A-Za-z0-9_.-]+$/.test(id)
+    ) {
+      return res.status(400).json({ error: 'Invalid match ID' });
+    }
+
+    // Look up match by ID to get the filename
+    const match = await demoService.getDemoMatchById(id);
+    if (!match) {
+      return res.status(404).json({ error: 'Demo match not found' });
+    }
+
+    if (!match.fileName) {
+      return res.status(404).json({ error: 'Demo file name not found for this match' });
+    }
+
+    // Sanitize filename from database: must be alphanumeric with underscores/hyphens/dots, and end in .dem
+    const filename = match.fileName;
+    if (!/^[A-Za-z0-9_.-]+\.dem$/.test(filename)) {
+      return res.status(400).json({ error: 'Demo file unavailable' });
     }
 
     const demoFilesDir = process.env.DEMO_FILES_DIR || '/app/demos';
-    const filePath = path.join(demoFilesDir, sanitizedFilename);
+    const filePath = path.join(demoFilesDir, filename);
 
     try {
       // Check if file exists
       await fs.access(filePath);
       
+      // Generate display name using service helper
+      const downloadFilename = demoService.generateDisplayName(match);
+      
       // Set appropriate headers for file download
       res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
       
       // Send the file
-      return res.sendFile(path.resolve(filePath));
+      return res.sendFile(filePath);
     } catch (error) {
       if (error.code === 'ENOENT') {
         return res.status(404).json({ error: 'Demo file not found' });

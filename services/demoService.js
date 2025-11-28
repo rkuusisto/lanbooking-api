@@ -45,6 +45,45 @@ function rowToObject(row) {
   }, {});
 }
 
+/**
+ * Format match date as dd.MM.yyyy HH:mm:ss
+ * @param {string|Date} dateInput - Date to format
+ * @returns {string} - Formatted date string or empty string if invalid
+ */
+export const formatMatchDate = (dateInput) => {
+  if (!dateInput) return '';
+  
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return '';
+  
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${pad(date.getDate())}.${pad(date.getMonth() + 1)}.${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
+/**
+ * Generate display name for a match
+ * @param {Object} match - Match object
+ * @returns {string} - Generated display name or filename fallback
+ */
+export const generateDisplayName = (match) => {
+  if (match.displayName) {
+    return match.displayName;
+  }
+  
+  if (match.teams && match.teams.length >= 2 && match.map && match.stage) {
+    const teamA = match.teams[0];
+    const teamB = match.teams[1];
+    const formattedDate = formatMatchDate(match.playedAt);
+    
+    if (formattedDate) {
+      return `${teamA.name} vs ${teamB.name} - ${match.map} - ${match.stage} - ${formattedDate}.dem`;
+    }
+    return `${teamA.name} vs ${teamB.name} - ${match.map} - ${match.stage}.dem`;
+  }
+  
+  return match.fileName || '';
+};
+
 function serializeRow(row) {
   const raw = rowToObject(row);
   const match = {
@@ -53,6 +92,7 @@ function serializeRow(row) {
     event: raw.event || null,
     stage: raw.stage || null,
     fileName: raw.fileName || null,
+    displayName: raw.displayName || null,
     fileSizeMB: raw.fileSizeMB || null,
     map: raw.map || null,
     bestOf: raw.bestOf || null,
@@ -191,6 +231,10 @@ export const createDemoMatch = async (matchData) => {
     { name: 'teams', type: TYPES.NVarChar, value: teamsJson },
   ];
   
+  if (matchData.displayName) {
+    params.push({ name: 'displayName', type: TYPES.NVarChar, value: matchData.displayName });
+  }
+  
   if (highlightsJson) {
     params.push({ name: 'highlights', type: TYPES.NVarChar, value: highlightsJson });
   }
@@ -215,6 +259,11 @@ export const createDemoMatch = async (matchData) => {
     '@id', '@tournamentId', '@event', '@stage', '@fileName',
     '@fileSizeMB', '@map', '@bestOf', '@playedAt', '@teams'
   ];
+  
+  if (matchData.displayName) {
+    columns.push('[displayName]');
+    values.push('@displayName');
+  }
   
   if (highlightsJson) {
     columns.push('[highlights]');
@@ -289,7 +338,12 @@ export const updateDemoMatch = async (id, matchData) => {
   
   assignments.push('[fileName] = @fileName');
   params.push({ name: 'fileName', type: TYPES.NVarChar, value: updatedMatch.fileName });
-  
+
+  if (updatedMatch.displayName !== undefined) {
+    assignments.push('[displayName] = @displayName');
+    params.push({ name: 'displayName', type: TYPES.NVarChar, value: updatedMatch.displayName || null });
+  }
+
   assignments.push('[fileSizeMB] = @fileSizeMB');
   params.push({ name: 'fileSizeMB', type: TYPES.Float, value: updatedMatch.fileSizeMB });
   
@@ -381,4 +435,6 @@ export default {
   updateDemoMatch,
   deleteDemoMatch,
   getDemoData,
+  formatMatchDate,
+  generateDisplayName,
 };
