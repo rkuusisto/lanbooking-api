@@ -31,9 +31,10 @@ services:
     restart: unless-stopped
 
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0.5
+    build:
+      context: .
+      dockerfile: Dockerfile.keycloak
     container_name: lanbooking-keycloak
-    entrypoint: ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
     environment:
       - KEYCLOAK_MODE=${KEYCLOAK_MODE:-production}
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
