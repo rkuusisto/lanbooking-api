@@ -30,5 +30,6 @@ RUN chmod +x /opt/keycloak/entrypoint.sh && \
 # Switch back to keycloak user
 USER keycloak
 
-ENTRYPOINT ["/opt/keycloak/entrypoint.sh"]
+# Use bash to execute entrypoint to handle permission issues with volume mounts
+ENTRYPOINT ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
 
