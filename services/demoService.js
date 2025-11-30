@@ -52,10 +52,10 @@ function rowToObject(row) {
  */
 export const formatMatchDate = (dateInput) => {
   if (!dateInput) return '';
-  
+
   const date = new Date(dateInput);
   if (isNaN(date.getTime())) return '';
-  
+
   const pad = (n) => n.toString().padStart(2, '0');
   return `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 };
@@ -72,7 +72,7 @@ export const sanitizeFilenameComponent = (str, maxLength = 255) => {
   if (!str || typeof str !== 'string') {
     return '';
   }
-  
+
   const sanitized = str
     // Remove control characters (0x00-0x1F, 0x7F-0x9F)
     .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
@@ -88,7 +88,7 @@ export const sanitizeFilenameComponent = (str, maxLength = 255) => {
     .trim()
     // Replace multiple spaces with single space
     .replace(/\s+/g, ' ');
-  
+
   // Enforce length limit (most filesystems have a 255-byte limit)
   return sanitized.substring(0, maxLength);
 };
@@ -107,26 +107,26 @@ export const generateDisplayName = (match) => {
       return sanitized.endsWith('.dem') ? sanitized : `${sanitized}.dem`;
     }
   }
-  
+
   // Generate from match data with sanitization
   if (match.teams && match.teams.length >= 2 && match.map && match.stage) {
     const teamA = match.teams[0];
     const teamB = match.teams[1];
     const formattedDate = formatMatchDate(match.playedAt);
-    
+
     // Sanitize all components
     const teamAName = sanitizeFilenameComponent(teamA.name) || 'Team1';
     const teamBName = sanitizeFilenameComponent(teamB.name) || 'Team2';
     const mapName = sanitizeFilenameComponent(match.map) || 'unknown';
     const stageName = sanitizeFilenameComponent(match.stage) || 'match';
     const datePart = sanitizeFilenameComponent(formattedDate);
-    
+
     if (datePart) {
       return `${teamAName} vs ${teamBName} - ${mapName} - ${stageName} - ${datePart}.dem`;
     }
     return `${teamAName} vs ${teamBName} - ${mapName} - ${stageName}.dem`;
   }
-  
+
   // Fallback to sanitized fileName or default
   const sanitizedFileName = sanitizeFilenameComponent(match.fileName);
   return sanitizedFileName || 'demo.dem';
@@ -164,8 +164,29 @@ function serializeRow(row) {
   return match;
 }
 
+/**
+ * Serialize match for public/unauthenticated endpoints (removes internal file paths)
+ * @param {Object} row - Database row
+ * @returns {Object} - Match object without fileName
+ */
+function serializeRowPublic(row) {
+  const match = serializeRow(row);
+  // Remove fileName to prevent exposing internal file paths
+  const { fileName, ...publicMatch } = match;
+  return publicMatch;
+}
+
 function serializeRows(rows) {
   return rows.map(row => serializeRow(row));
+}
+
+/**
+ * Serialize rows for public/unauthenticated endpoints (removes internal file paths)
+ * @param {Array} rows - Database rows
+ * @returns {Array} - Array of match objects without fileName
+ */
+function serializeRowsPublic(rows) {
+  return rows.map(row => serializeRowPublic(row));
 }
 
 /**
@@ -174,38 +195,43 @@ function serializeRows(rows) {
  * @returns {boolean}
  */
 function validateMatch(match) {
-  const requiredFields = ['id', 'tournamentId', 'event', 'stage', 'fileName', 'fileSizeMB', 'map', 'bestOf', 'playedAt', 'teams'];
-  
+  const requiredFields = ['id', 'tournamentId', 'event', 'stage', 'bestOf'];
+
   for (const field of requiredFields) {
     if (match[field] === undefined || match[field] === null) {
       return false;
     }
   }
-  
-  // Validate teams array
-  if (!Array.isArray(match.teams) || match.teams.length !== 2) {
-    return false;
-  }
-  
-  // Validate each team
-  for (const team of match.teams) {
-    if (!team.name || typeof team.score !== 'number' || !Array.isArray(team.players)) {
+
+  if (match.teams) {
+    // Validate teams array
+    if (!Array.isArray(match.teams) || match.teams.length !== 2) {
       return false;
     }
+
   }
-  
+
   return true;
 }
 
 /**
  * Get all demo matches
+ * @param {Function} serializer - Optional serialization function (defaults to serializeRows)
  * @returns {Promise<Array>}
  */
-export const getDemoMatches = async () => {
+export const getDemoMatches = async (serializer = serializeRows) => {
   const { rows } = await execute(
     `SELECT * FROM ${TABLE} ORDER BY [playedAt] DESC`
   );
-  return serializeRows(rows);
+  return serializer(rows);
+};
+
+/**
+ * Get all demo matches for public/unauthenticated endpoints (without internal file paths)
+ * @returns {Promise<Array>}
+ */
+export const getDemoMatchesPublic = async () => {
+  return getDemoMatches(serializeRowsPublic);
 };
 
 /**
@@ -217,34 +243,56 @@ export const getDemoMatchById = async (id) => {
   if (!id || typeof id !== 'string') {
     return null;
   }
-  
+
   const { rows } = await execute(
     `SELECT * FROM ${TABLE} WHERE [id] = @id`,
     [{ name: 'id', type: TYPES.NVarChar, value: id }]
   );
-  
+
   if (rows.length === 0) {
     return null;
   }
-  
+
   return serializeRow(rows[0]);
+};
+
+/**
+ * Get demo match by ID for public/unauthenticated endpoints (without internal file paths)
+ * @param {string} id - Match ID
+ * @returns {Promise<Object|null>}
+ */
+export const getDemoMatchByIdPublic = async (id) => {
+  const match = await getDemoMatchById(id);
+  if (!match) return null;
+  const { fileName, ...publicMatch } = match;
+  return publicMatch;
 };
 
 /**
  * Get all matches for a specific tournament
  * @param {string} tournamentId - Tournament ID
+ * @param {Function} serializer - Optional serialization function (defaults to serializeRows)
  * @returns {Promise<Array>}
  */
-export const getDemoMatchesByTournament = async (tournamentId) => {
+export const getDemoMatchesByTournament = async (tournamentId, serializer = serializeRows) => {
   if (!tournamentId || typeof tournamentId !== 'string') {
     return [];
   }
-  
+
   const { rows } = await execute(
     `SELECT * FROM ${TABLE} WHERE [tournamentId] = @tournamentId ORDER BY [playedAt] DESC`,
     [{ name: 'tournamentId', type: TYPES.NVarChar, value: tournamentId }]
   );
-  return serializeRows(rows);
+  return serializer(rows);
+};
+
+/**
+ * Get all matches for a specific tournament for public/unauthenticated endpoints (without internal file paths)
+ * @param {string} tournamentId - Tournament ID
+ * @returns {Promise<Array>}
+ */
+export const getDemoMatchesByTournamentPublic = async (tournamentId) => {
+  return getDemoMatchesByTournament(tournamentId, serializeRowsPublic);
 };
 
 /**
@@ -256,105 +304,95 @@ export const createDemoMatch = async (matchData) => {
   if (!validateMatch(matchData)) {
     throw createHttpError(400, 'Invalid match data: missing required fields');
   }
-  
+
   // Check if match with this ID already exists
   const existing = await getDemoMatchById(matchData.id);
   if (existing) {
     throw createHttpError(409, `Match with ID '${matchData.id}' already exists`);
   }
-  
+
   // Prepare teams and highlights as JSON strings
   const teamsJson = JSON.stringify(matchData.teams);
   const highlightsJson = matchData.highlights ? JSON.stringify(matchData.highlights) : null;
   const playedAtDate = new Date(matchData.playedAt);
-  
+
   const params = [
     { name: 'id', type: TYPES.NVarChar, value: matchData.id },
     { name: 'tournamentId', type: TYPES.NVarChar, value: matchData.tournamentId },
     { name: 'event', type: TYPES.NVarChar, value: matchData.event },
     { name: 'stage', type: TYPES.NVarChar, value: matchData.stage },
-    { name: 'fileName', type: TYPES.NVarChar, value: matchData.fileName },
-    { name: 'fileSizeMB', type: TYPES.Float, value: matchData.fileSizeMB },
     { name: 'map', type: TYPES.NVarChar, value: matchData.map },
     { name: 'bestOf', type: TYPES.Int, value: matchData.bestOf },
     { name: 'playedAt', type: TYPES.DateTime, value: playedAtDate },
     { name: 'teams', type: TYPES.NVarChar, value: teamsJson },
   ];
-  
-  if (matchData.displayName) {
-    params.push({ name: 'displayName', type: TYPES.NVarChar, value: matchData.displayName });
-  }
-  
-  if (highlightsJson) {
-    params.push({ name: 'highlights', type: TYPES.NVarChar, value: highlightsJson });
-  }
-  
-  if (matchData.durationMinutes !== undefined && matchData.durationMinutes !== null) {
-    params.push({ name: 'durationMinutes', type: TYPES.Int, value: matchData.durationMinutes });
-  }
-  
-  if (matchData.rounds !== undefined && matchData.rounds !== null) {
-    params.push({ name: 'rounds', type: TYPES.Int, value: matchData.rounds });
-  }
-  
-  if (matchData.notes) {
-    params.push({ name: 'notes', type: TYPES.NVarChar, value: matchData.notes });
-  }
-  
-  if (matchData.parseStatus !== undefined) {
-    params.push({ name: 'parseStatus', type: TYPES.NVarChar, value: matchData.parseStatus });
-  }
-  
-  if (matchData.parseError !== undefined) {
-    params.push({ name: 'parseError', type: TYPES.NVarChar, value: matchData.parseError });
-  }
-  
+
   const columns = [
-    '[id]', '[tournamentId]', '[event]', '[stage]', '[fileName]', 
-    '[fileSizeMB]', '[map]', '[bestOf]', '[playedAt]', '[teams]'
+    '[id]', '[tournamentId]', '[event]', '[stage]',
+    '[map]', '[bestOf]', '[playedAt]', '[teams]'
   ];
   const values = [
-    '@id', '@tournamentId', '@event', '@stage', '@fileName',
-    '@fileSizeMB', '@map', '@bestOf', '@playedAt', '@teams'
+    '@id', '@tournamentId', '@event', '@stage',
+    '@map', '@bestOf', '@playedAt', '@teams'
   ];
-  
+
+  // Optional fields
+  if (matchData.fileName !== undefined && matchData.fileName !== null) {
+    columns.push('[fileName]');
+    values.push('@fileName');
+    params.push({ name: 'fileName', type: TYPES.NVarChar, value: matchData.fileName });
+  }
+
+  if (matchData.fileSizeMB !== undefined && matchData.fileSizeMB !== null) {
+    columns.push('[fileSizeMB]');
+    values.push('@fileSizeMB');
+    params.push({ name: 'fileSizeMB', type: TYPES.Float, value: matchData.fileSizeMB });
+  }
+
   if (matchData.displayName) {
     columns.push('[displayName]');
     values.push('@displayName');
+    params.push({ name: 'displayName', type: TYPES.NVarChar, value: matchData.displayName });
   }
-  
+
   if (highlightsJson) {
     columns.push('[highlights]');
     values.push('@highlights');
+    params.push({ name: 'highlights', type: TYPES.NVarChar, value: highlightsJson });
   }
-  
+
   if (matchData.durationMinutes !== undefined && matchData.durationMinutes !== null) {
     columns.push('[durationMinutes]');
     values.push('@durationMinutes');
+    params.push({ name: 'durationMinutes', type: TYPES.Int, value: matchData.durationMinutes });
   }
-  
+
   if (matchData.rounds !== undefined && matchData.rounds !== null) {
     columns.push('[rounds]');
     values.push('@rounds');
+    params.push({ name: 'rounds', type: TYPES.Int, value: matchData.rounds });
   }
-  
+
   if (matchData.notes) {
     columns.push('[notes]');
     values.push('@notes');
+    params.push({ name: 'notes', type: TYPES.NVarChar, value: matchData.notes });
   }
-  
+
   if (matchData.parseStatus !== undefined) {
     columns.push('[parseStatus]');
     values.push('@parseStatus');
+    params.push({ name: 'parseStatus', type: TYPES.NVarChar, value: matchData.parseStatus });
   }
-  
+
   if (matchData.parseError !== undefined) {
     columns.push('[parseError]');
     values.push('@parseError');
+    params.push({ name: 'parseError', type: TYPES.NVarChar, value: matchData.parseError });
   }
-  
+
   const query = `INSERT INTO ${TABLE} (${columns.join(', ')}) OUTPUT INSERTED.* VALUES (${values.join(', ')});`;
-  
+
   const { rows } = await execute(query, params);
   return serializeRow(rows[0]);
 };
@@ -369,41 +407,41 @@ export const updateDemoMatch = async (id, matchData) => {
   if (!id || typeof id !== 'string') {
     return null;
   }
-  
+
   // Check if match exists
   const existing = await getDemoMatchById(id);
   if (!existing) {
     return null;
   }
-  
+
   // Merge existing match with updates
   const updatedMatch = {
     ...existing,
     ...matchData,
     id, // Ensure ID can't be changed
   };
-  
+
   if (!validateMatch(updatedMatch)) {
     throw createHttpError(400, 'Invalid match data: missing required fields');
   }
-  
+
   // Prepare teams and highlights as JSON strings
   const teamsJson = JSON.stringify(updatedMatch.teams);
   const highlightsJson = updatedMatch.highlights ? JSON.stringify(updatedMatch.highlights) : null;
   const playedAtDate = new Date(updatedMatch.playedAt);
-  
+
   const assignments = [];
   const params = [];
-  
+
   assignments.push('[tournamentId] = @tournamentId');
   params.push({ name: 'tournamentId', type: TYPES.NVarChar, value: updatedMatch.tournamentId });
-  
+
   assignments.push('[event] = @event');
   params.push({ name: 'event', type: TYPES.NVarChar, value: updatedMatch.event });
-  
+
   assignments.push('[stage] = @stage');
   params.push({ name: 'stage', type: TYPES.NVarChar, value: updatedMatch.stage });
-  
+
   assignments.push('[fileName] = @fileName');
   params.push({ name: 'fileName', type: TYPES.NVarChar, value: updatedMatch.fileName });
 
@@ -414,64 +452,64 @@ export const updateDemoMatch = async (id, matchData) => {
 
   assignments.push('[fileSizeMB] = @fileSizeMB');
   params.push({ name: 'fileSizeMB', type: TYPES.Float, value: updatedMatch.fileSizeMB });
-  
+
   assignments.push('[map] = @map');
   params.push({ name: 'map', type: TYPES.NVarChar, value: updatedMatch.map });
-  
+
   assignments.push('[bestOf] = @bestOf');
   params.push({ name: 'bestOf', type: TYPES.Int, value: updatedMatch.bestOf });
-  
+
   assignments.push('[playedAt] = @playedAt');
   params.push({ name: 'playedAt', type: TYPES.DateTime, value: playedAtDate });
-  
+
   assignments.push('[teams] = @teams');
   params.push({ name: 'teams', type: TYPES.NVarChar, value: teamsJson });
-  
+
   if (updatedMatch.highlights !== undefined) {
     assignments.push('[highlights] = @highlights');
     params.push({ name: 'highlights', type: TYPES.NVarChar, value: highlightsJson });
   }
-  
+
   if (updatedMatch.durationMinutes !== undefined) {
     assignments.push('[durationMinutes] = @durationMinutes');
     params.push({ name: 'durationMinutes', type: TYPES.Int, value: updatedMatch.durationMinutes });
   }
-  
+
   if (updatedMatch.rounds !== undefined) {
     assignments.push('[rounds] = @rounds');
     params.push({ name: 'rounds', type: TYPES.Int, value: updatedMatch.rounds });
   }
-  
+
   if (updatedMatch.notes !== undefined) {
     assignments.push('[notes] = @notes');
     params.push({ name: 'notes', type: TYPES.NVarChar, value: updatedMatch.notes || null });
   }
-  
+
   if (updatedMatch.parseStatus !== undefined) {
     assignments.push('[parseStatus] = @parseStatus');
     params.push({ name: 'parseStatus', type: TYPES.NVarChar, value: updatedMatch.parseStatus });
   }
-  
+
   if (updatedMatch.parseError !== undefined) {
     assignments.push('[parseError] = @parseError');
     params.push({ name: 'parseError', type: TYPES.NVarChar, value: updatedMatch.parseError || null });
   }
-  
+
   assignments.push('[updatedAt] = GETDATE()');
-  
+
   params.push({ name: 'id', type: TYPES.NVarChar, value: id });
-  
+
   const query = `UPDATE ${TABLE}
     SET ${assignments.join(', ')}
     OUTPUT INSERTED.*
     WHERE [id] = @id;`;
-  
+
   const { rows, rowCount } = await execute(query, params);
-  
+
   if (rowCount === 0) {
     return null;
   }
-  
+
   return serializeRow(rows[0]);
 };
 
@@ -484,7 +522,7 @@ export const deleteDemoMatch = async (id) => {
   if (!id || typeof id !== 'string') {
     return false;
   }
-  
+
   const query = `DELETE FROM ${TABLE} OUTPUT DELETED.[id] WHERE [id] = @id;`;
   const { rowCount } = await execute(query, [
     { name: 'id', type: TYPES.NVarChar, value: id },
@@ -494,15 +532,24 @@ export const deleteDemoMatch = async (id) => {
 
 /**
  * Get demo data structure with schema version
+ * @param {Function} serializer - Optional serialization function (defaults to serializeRows)
  * @returns {Promise<Object>}
  */
-export const getDemoData = async () => {
-  const matches = await getDemoMatches();
+export const getDemoData = async (serializer = serializeRows) => {
+  const matches = await getDemoMatches(serializer);
   return {
     schemaVersion: '1.0.0',
     generatedAt: new Date().toISOString(),
     matches,
   };
+};
+
+/**
+ * Get demo data structure with schema version for public/unauthenticated endpoints (without internal file paths)
+ * @returns {Promise<Object>}
+ */
+export const getDemoDataPublic = async () => {
+  return getDemoData(serializeRowsPublic);
 };
 
 /**
@@ -521,10 +568,10 @@ export const upsertDemoMatch = async (matchData) => {
   if (!validateMatch(matchData)) {
     throw createHttpError(400, 'Invalid match data: missing required fields');
   }
-  
+
   // Check if match exists
   const existing = await getDemoMatchById(matchData.id);
-  
+
   if (existing) {
     // Update existing match
     return await updateDemoMatch(matchData.id, matchData);
@@ -544,61 +591,61 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
   if (!matchId || typeof matchId !== 'string') {
     throw createHttpError(400, 'Invalid match ID');
   }
-  
+
   // Verify match exists
   const match = await getDemoMatchById(matchId);
   if (!match) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   // Normalize to array
   const players = Array.isArray(playersData) ? playersData : [playersData];
-  
+
   if (players.length === 0) {
     throw createHttpError(400, 'No players provided');
   }
-  
+
   // Batch fetch all existing players for this match to avoid N+1 queries
   const steamIds = players.map(p => p.steamId).filter(Boolean);
   const steamIdPlaceholders = steamIds.map((_, i) => `@steamId${i}`).join(', ');
-  const steamIdParams = steamIds.map((id, i) => ({ 
-    name: `steamId${i}`, 
-    type: TYPES.NVarChar, 
-    value: id 
+  const steamIdParams = steamIds.map((id, i) => ({
+    name: `steamId${i}`,
+    type: TYPES.NVarChar,
+    value: id
   }));
-  
+
   const { rows: existingRows } = await execute(
     `SELECT [id], [steamId] FROM [DemoMatchPlayers] WHERE [matchId] = @matchId ${steamIds.length > 0 ? `AND [steamId] IN (${steamIdPlaceholders})` : 'AND 1=0'}`,
     [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }, ...steamIdParams]
   );
-  
+
   // Build a map of existing players
   const existingPlayersMap = new Map();
   existingRows.forEach(row => {
     const obj = rowToObject(row);
     existingPlayersMap.set(obj.steamId, obj.id);
   });
-  
+
   let processed = 0;
   let created = 0;
   let updated = 0;
   let failed = 0;
   const errors = [];
-  
+
   for (const player of players) {
     try {
       // Validate required fields
       if (!player.steamId || !player.playerName || !player.team) {
         throw new Error('Missing required fields: steamId, playerName, team');
       }
-      
+
       if (!['CT', 'T'].includes(player.team)) {
         throw new Error('team must be either CT or T');
       }
-      
+
       // Check if player exists using the pre-fetched map
       const exists = existingPlayersMap.has(player.steamId);
-      
+
       if (exists) {
         // Update existing player
         const assignments = [];
@@ -606,13 +653,13 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
           { name: 'matchId', type: TYPES.NVarChar, value: matchId },
           { name: 'steamId', type: TYPES.NVarChar, value: player.steamId }
         ];
-        
+
         assignments.push('[playerName] = @playerName');
         params.push({ name: 'playerName', type: TYPES.NVarChar, value: player.playerName });
-        
+
         assignments.push('[team] = @team');
         params.push({ name: 'team', type: TYPES.NVarChar, value: player.team });
-        
+
         if (player.kills !== undefined) {
           assignments.push('[kills] = @kills');
           params.push({ name: 'kills', type: TYPES.Int, value: player.kills ?? 0 });
@@ -661,9 +708,9 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
           assignments.push('[flashAssists] = @flashAssists');
           params.push({ name: 'flashAssists', type: TYPES.Int, value: player.flashAssists ?? 0 });
         }
-        
+
         assignments.push('[updatedAt] = GETDATE()');
-        
+
         await execute(
           `UPDATE [DemoMatchPlayers] SET ${assignments.join(', ')} WHERE [matchId] = @matchId AND [steamId] = @steamId`,
           params
@@ -679,7 +726,7 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
           { name: 'playerName', type: TYPES.NVarChar, value: player.playerName },
           { name: 'team', type: TYPES.NVarChar, value: player.team }
         ];
-        
+
         if (player.kills !== undefined) {
           columns.push('[kills]');
           values.push('@kills');
@@ -740,7 +787,7 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
           values.push('@flashAssists');
           params.push({ name: 'flashAssists', type: TYPES.Int, value: player.flashAssists ?? 0 });
         }
-        
+
         await execute(
           `INSERT INTO [DemoMatchPlayers] (${columns.join(', ')}) VALUES (${values.join(', ')})`,
           params
@@ -757,13 +804,13 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
       });
     }
   }
-  
+
   // Fetch all players for this match to return in response
   const { rows: allPlayersRows } = await execute(
     `SELECT * FROM [DemoMatchPlayers] WHERE [matchId] = @matchId`,
     [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }]
   );
-  
+
   const allPlayers = allPlayersRows.map(row => {
     const player = rowToObject(row);
     return {
@@ -788,14 +835,14 @@ export const upsertMatchPlayers = async (matchId, playersData) => {
       updatedAt: player.updatedAt ? player.updatedAt.toISOString() : null,
     };
   });
-  
-  return { 
-    processed, 
-    created, 
-    updated, 
-    failed, 
+
+  return {
+    processed,
+    created,
+    updated,
+    failed,
     errors: failed > 0 ? errors : undefined,
-    players: allPlayers 
+    players: allPlayers
   };
 };
 
@@ -809,68 +856,68 @@ export const createMatchRounds = async (matchId, roundsData) => {
   if (!matchId || typeof matchId !== 'string') {
     throw createHttpError(400, 'Invalid match ID');
   }
-  
+
   // Verify match exists
   const match = await getDemoMatchById(matchId);
   if (!match) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   // Normalize to array
   const rounds = Array.isArray(roundsData) ? roundsData : [roundsData];
-  
+
   if (rounds.length === 0) {
     throw createHttpError(400, 'No rounds provided');
   }
-  
+
   // Batch fetch all existing rounds for this match to avoid N+1 queries
   const roundNumbers = rounds.map(r => r.roundNumber).filter(n => n !== undefined);
   const roundNumPlaceholders = roundNumbers.map((_, i) => `@roundNum${i}`).join(', ');
-  const roundNumParams = roundNumbers.map((num, i) => ({ 
-    name: `roundNum${i}`, 
-    type: TYPES.Int, 
-    value: num 
+  const roundNumParams = roundNumbers.map((num, i) => ({
+    name: `roundNum${i}`,
+    type: TYPES.Int,
+    value: num
   }));
-  
+
   const { rows: existingRows } = await execute(
     `SELECT [id], [roundNumber] FROM [DemoMatchRounds] WHERE [matchId] = @matchId ${roundNumbers.length > 0 ? `AND [roundNumber] IN (${roundNumPlaceholders})` : 'AND 1=0'}`,
     [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }, ...roundNumParams]
   );
-  
+
   // Build a map of existing rounds
   const existingRoundsMap = new Map();
   existingRows.forEach(row => {
     const obj = rowToObject(row);
     existingRoundsMap.set(obj.roundNumber, obj.id);
   });
-  
+
   let processed = 0;
   let created = 0;
   let failed = 0;
   const errors = [];
   const roundIds = [];
-  
+
   for (const round of rounds) {
     try {
       // Validate required fields
-      if (round.roundNumber === undefined || round.winner === undefined || 
-          round.winReason === undefined || round.ctScore === undefined || 
-          round.tScore === undefined) {
+      if (round.roundNumber === undefined || round.winner === undefined ||
+        round.winReason === undefined || round.ctScore === undefined ||
+        round.tScore === undefined) {
         throw new Error('Missing required fields: roundNumber, winner, winReason, ctScore, tScore');
       }
-      
+
       if (!['CT', 'T'].includes(round.winner)) {
         throw new Error('winner must be either CT or T');
       }
-      
+
       if (!['elimination', 'defuse', 'time', 'bomb'].includes(round.winReason)) {
         throw new Error('winReason must be one of: elimination, defuse, time, bomb');
       }
-      
+
       // Check if round exists using the pre-fetched map
       const exists = existingRoundsMap.has(round.roundNumber);
       let roundId;
-      
+
       if (exists) {
         // Update existing round
         roundId = existingRoundsMap.get(round.roundNumber);
@@ -879,19 +926,19 @@ export const createMatchRounds = async (matchId, roundsData) => {
           { name: 'matchId', type: TYPES.NVarChar, value: matchId },
           { name: 'roundNumber', type: TYPES.Int, value: round.roundNumber }
         ];
-        
+
         assignments.push('[winner] = @winner');
         params.push({ name: 'winner', type: TYPES.NVarChar, value: round.winner });
-        
+
         assignments.push('[winReason] = @winReason');
         params.push({ name: 'winReason', type: TYPES.NVarChar, value: round.winReason });
-        
+
         assignments.push('[ctScore] = @ctScore');
         params.push({ name: 'ctScore', type: TYPES.Int, value: round.ctScore });
-        
+
         assignments.push('[tScore] = @tScore');
         params.push({ name: 'tScore', type: TYPES.Int, value: round.tScore });
-        
+
         if (round.durationSeconds !== undefined) {
           assignments.push('[durationSeconds] = @durationSeconds');
           params.push({ name: 'durationSeconds', type: TYPES.Int, value: round.durationSeconds });
@@ -904,7 +951,7 @@ export const createMatchRounds = async (matchId, roundsData) => {
           assignments.push('[endTick] = @endTick');
           params.push({ name: 'endTick', type: TYPES.Int, value: round.endTick });
         }
-        
+
         await execute(
           `UPDATE [DemoMatchRounds] SET ${assignments.join(', ')} WHERE [matchId] = @matchId AND [roundNumber] = @roundNumber`,
           params
@@ -921,7 +968,7 @@ export const createMatchRounds = async (matchId, roundsData) => {
           { name: 'ctScore', type: TYPES.Int, value: round.ctScore },
           { name: 'tScore', type: TYPES.Int, value: round.tScore }
         ];
-        
+
         if (round.durationSeconds !== undefined) {
           columns.push('[durationSeconds]');
           values.push('@durationSeconds');
@@ -937,7 +984,7 @@ export const createMatchRounds = async (matchId, roundsData) => {
           values.push('@endTick');
           params.push({ name: 'endTick', type: TYPES.Int, value: round.endTick });
         }
-        
+
         const { rows } = await execute(
           `INSERT INTO [DemoMatchRounds] (${columns.join(', ')}) OUTPUT INSERTED.[id] VALUES (${values.join(', ')})`,
           params
@@ -945,7 +992,7 @@ export const createMatchRounds = async (matchId, roundsData) => {
         roundId = rowToObject(rows[0]).id;
         created++;
       }
-      
+
       roundIds.push(roundId);
       processed++;
     } catch (error) {
@@ -957,7 +1004,7 @@ export const createMatchRounds = async (matchId, roundsData) => {
       });
     }
   }
-  
+
   return { processed, created, roundIds, failed, errors: failed > 0 ? errors : undefined };
 };
 
@@ -972,17 +1019,17 @@ export const createRoundEvents = async (matchId, roundId, eventsData) => {
   if (!matchId || typeof matchId !== 'string') {
     throw createHttpError(400, 'Invalid match ID');
   }
-  
+
   if (!roundId || typeof roundId !== 'string') {
     throw createHttpError(400, 'Invalid round ID');
   }
-  
+
   // Verify match exists
   const match = await getDemoMatchById(matchId);
   if (!match) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   // Verify round exists and belongs to match
   const { rows: roundRows } = await execute(
     `SELECT [id], [roundNumber] FROM [DemoMatchRounds] WHERE [id] = @roundId AND [matchId] = @matchId`,
@@ -991,39 +1038,39 @@ export const createRoundEvents = async (matchId, roundId, eventsData) => {
       { name: 'matchId', type: TYPES.NVarChar, value: matchId }
     ]
   );
-  
+
   if (roundRows.length === 0) {
     throw createHttpError(404, 'Round not found');
   }
-  
+
   const round = rowToObject(roundRows[0]);
   const roundNumber = round.roundNumber;
-  
+
   // Normalize to array
   const events = Array.isArray(eventsData) ? eventsData : [eventsData];
-  
+
   if (events.length === 0) {
     throw createHttpError(400, 'No events provided');
   }
-  
+
   let processed = 0;
   let created = 0;
   let failed = 0;
   const errors = [];
   const eventIds = [];
-  
+
   for (const event of events) {
     try {
       // Validate required fields
       if (event.roundNumber === undefined || event.eventType === undefined || event.tick === undefined) {
         throw new Error('Missing required fields: roundNumber, eventType, tick');
       }
-      
+
       const validEventTypes = ['kill', 'assist', 'death', 'flash', 'smoke', 'he', 'molotov', 'defuse', 'plant'];
       if (!validEventTypes.includes(event.eventType)) {
         throw new Error(`eventType must be one of: ${validEventTypes.join(', ')}`);
       }
-      
+
       // Create event
       const columns = ['[id]', '[roundId]', '[matchId]', '[roundNumber]', '[eventType]', '[tick]'];
       const values = ['NEWID()', '@roundId', '@matchId', '@roundNumber', '@eventType', '@tick'];
@@ -1034,7 +1081,7 @@ export const createRoundEvents = async (matchId, roundId, eventsData) => {
         { name: 'eventType', type: TYPES.NVarChar, value: event.eventType },
         { name: 'tick', type: TYPES.Int, value: event.tick }
       ];
-      
+
       if (event.attackerSteamId !== undefined) {
         columns.push('[attackerSteamId]');
         values.push('@attackerSteamId');
@@ -1085,12 +1132,12 @@ export const createRoundEvents = async (matchId, roundId, eventsData) => {
         values.push('@eventData');
         params.push({ name: 'eventData', type: TYPES.NVarChar, value: JSON.stringify(event.eventData) });
       }
-      
+
       const { rows } = await execute(
         `INSERT INTO [DemoRoundEvents] (${columns.join(', ')}) OUTPUT INSERTED.[id] VALUES (${values.join(', ')})`,
         params
       );
-      
+
       eventIds.push(rowToObject(rows[0]).id);
       created++;
       processed++;
@@ -1099,7 +1146,7 @@ export const createRoundEvents = async (matchId, roundId, eventsData) => {
       errors.push(`Event at tick ${event.tick}: ${error.message}`);
     }
   }
-  
+
   return { processed, created, eventIds, failed, errors: failed > 0 ? errors : undefined };
 };
 
@@ -1113,27 +1160,27 @@ export const upsertMatchInsights = async (matchId, insightsData) => {
   if (!matchId || typeof matchId !== 'string') {
     throw createHttpError(400, 'Invalid match ID');
   }
-  
+
   // Verify match exists
   const match = await getDemoMatchById(matchId);
   if (!match) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   // Check if insights exist
   const { rows: existingRows } = await execute(
     `SELECT [id] FROM [DemoMatchInsights] WHERE [matchId] = @matchId`,
     [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }]
   );
-  
+
   const exists = existingRows.length > 0;
-  
+
   if (exists) {
     // Update existing insights
     const insightId = rowToObject(existingRows[0]).id;
     const assignments = [];
     const params = [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }];
-    
+
     if (insightsData.ctSideStats !== undefined) {
       assignments.push('[ctSideStats] = @ctSideStats');
       params.push({ name: 'ctSideStats', type: TYPES.NVarChar, value: JSON.stringify(insightsData.ctSideStats) });
@@ -1166,27 +1213,27 @@ export const upsertMatchInsights = async (matchId, insightsData) => {
       assignments.push('[roundWinProbability] = @roundWinProbability');
       params.push({ name: 'roundWinProbability', type: TYPES.NVarChar, value: JSON.stringify(insightsData.roundWinProbability) });
     }
-    
+
     assignments.push('[updatedAt] = GETDATE()');
-    
+
     await execute(
       `UPDATE [DemoMatchInsights] SET ${assignments.join(', ')} WHERE [matchId] = @matchId`,
       params
     );
-    
+
     // Fetch updated record
     const { rows } = await execute(
       `SELECT * FROM [DemoMatchInsights] WHERE [id] = @id`,
       [{ name: 'id', type: TYPES.NVarChar, value: insightId }]
     );
-    
+
     return serializeInsight(rows[0]);
   } else {
     // Create new insights
     const columns = ['[id]', '[matchId]'];
     const values = ['NEWID()', '@matchId'];
     const params = [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }];
-    
+
     if (insightsData.ctSideStats !== undefined) {
       columns.push('[ctSideStats]');
       values.push('@ctSideStats');
@@ -1227,12 +1274,12 @@ export const upsertMatchInsights = async (matchId, insightsData) => {
       values.push('@roundWinProbability');
       params.push({ name: 'roundWinProbability', type: TYPES.NVarChar, value: JSON.stringify(insightsData.roundWinProbability) });
     }
-    
+
     const { rows } = await execute(
       `INSERT INTO [DemoMatchInsights] (${columns.join(', ')}) OUTPUT INSERTED.* VALUES (${values.join(', ')})`,
       params
     );
-    
+
     return serializeInsight(rows[0]);
   }
 };
@@ -1250,7 +1297,7 @@ function serializeInsight(row) {
     createdAt: raw.createdAt ? raw.createdAt.toISOString() : null,
     updatedAt: raw.updatedAt ? raw.updatedAt.toISOString() : null,
   };
-  
+
   if (raw.ctSideStats) {
     insight.ctSideStats = JSON.parse(raw.ctSideStats);
   }
@@ -1275,7 +1322,7 @@ function serializeInsight(row) {
   if (raw.roundWinProbability) {
     insight.roundWinProbability = JSON.parse(raw.roundWinProbability);
   }
-  
+
   return insight;
 }
 
@@ -1289,44 +1336,44 @@ export const updateMatchParseStatus = async (matchId, statusData) => {
   if (!matchId || typeof matchId !== 'string') {
     throw createHttpError(400, 'Invalid match ID');
   }
-  
+
   if (!statusData.parseStatus) {
     throw createHttpError(400, 'parseStatus is required');
   }
-  
+
   const validStatuses = ['pending', 'processing', 'completed', 'failed'];
   if (!validStatuses.includes(statusData.parseStatus)) {
     throw createHttpError(400, `parseStatus must be one of: ${validStatuses.join(', ')}`);
   }
-  
+
   // Verify match exists
   const match = await getDemoMatchById(matchId);
   if (!match) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   const assignments = [];
   const params = [{ name: 'matchId', type: TYPES.NVarChar, value: matchId }];
-  
+
   assignments.push('[parseStatus] = @parseStatus');
   params.push({ name: 'parseStatus', type: TYPES.NVarChar, value: statusData.parseStatus });
-  
+
   if (statusData.parseError !== undefined) {
     assignments.push('[parseError] = @parseError');
     params.push({ name: 'parseError', type: TYPES.NVarChar, value: statusData.parseError || null });
   }
-  
+
   assignments.push('[updatedAt] = GETDATE()');
-  
+
   const { rows } = await execute(
     `UPDATE ${TABLE} SET ${assignments.join(', ')} OUTPUT INSERTED.[id], INSERTED.[parseStatus], INSERTED.[parseError], INSERTED.[updatedAt] WHERE [id] = @matchId`,
     params
   );
-  
+
   if (rows.length === 0) {
     throw createHttpError(404, 'Match not found');
   }
-  
+
   const result = rowToObject(rows[0]);
   return {
     id: result.id,
@@ -1339,11 +1386,15 @@ export const updateMatchParseStatus = async (matchId, statusData) => {
 export default {
   getDemoMatches,
   getDemoMatchById,
+  getDemoMatchByIdPublic,
   getDemoMatchesByTournament,
+  getDemoMatchesPublic,
+  getDemoMatchesByTournamentPublic,
   createDemoMatch,
   updateDemoMatch,
   deleteDemoMatch,
   getDemoData,
+  getDemoDataPublic,
   formatMatchDate,
   generateDisplayName,
   sanitizeFilenameComponent,

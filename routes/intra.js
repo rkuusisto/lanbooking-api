@@ -207,15 +207,31 @@ router.delete(
 );
 
 // Demo Matches (admin operations)
+router.get(
+  '/demos/matches',
+  asyncHandler(async (req, res) => {
+    const { tournamentId } = req.query;
+    
+    let matches;
+    if (tournamentId) {
+      matches = await demoService.getDemoMatchesByTournament(tournamentId);
+    } else {
+      matches = await demoService.getDemoMatches();
+    }
+    
+    res.json({ data: matches });
+  })
+);
+
 router.post(
   '/demos/matches',
   asyncHandler(async (req, res) => {
     const matchData = req.body ?? {};
     
     // Validate required fields
-    if (!matchData.tournamentId || !matchData.team1 || !matchData.team2) {
+    if (!matchData.tournamentId) {
       return res.status(400).json({ 
-        error: 'Missing required fields: tournamentId, team1, and team2 are required' 
+        error: 'Missing required: tournamentId' 
       });
     }
     

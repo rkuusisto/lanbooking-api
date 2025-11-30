@@ -1,5 +1,6 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
 import { requireAuth } from '../middleware/auth.js';
 import { validateDemoMatch } from '../middleware/validateDemoMatch.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -25,6 +26,76 @@ const bulkOperationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/**
+ * @swagger
+ * /demo-matches/{matchId}:
+ *   get:
+ *     summary: Get a demo match by ID
+ *     tags: [Demo Parser]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: matchId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The match ID
+ *     responses:
+ *       200:
+ *         description: Demo match retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Match not found
+ *       429:
+ *         description: Too many requests
+ */
+router.get(
+  '/demo-matches/:matchId',
+  demoParserLimiter,
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { matchId } = req.params;
+    
+    if (!matchId) {
+      return res.status(400).json({ error: 'Match ID is required' });
+    }
+    
+    const match = await demoService.getDemoMatchById(matchId);
+    
+    if (!match) {
+      return res.status(404).json({ error: 'Demo match not found' });
+    }
+    
+    // Generate ETag from match data for conditional requests
+    const matchString = JSON.stringify(match);
+    const etag = crypto.createHash('md5').update(matchString).digest('hex');
+    const etagHeader = `"${etag}"`;
+    
+    // Check if client has cached version
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (ifNoneMatch === etagHeader) {
+      return res.status(304).end(); // Not Modified
+    }
+    
+    // Set cache headers for relatively static match data (5 minutes)
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('ETag', etagHeader);
+    
+    // Set Last-Modified if match has updatedAt timestamp
+    if (match.updatedAt) {
+      res.setHeader('Last-Modified', new Date(match.updatedAt).toUTCString());
+    }
+    
+    return res.status(200).json(match);
+  })
+);
 
 /**
  * @swagger

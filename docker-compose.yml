@@ -23,9 +23,9 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
       - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
       - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
-      - DEMO_FILES_DIR=${DEMO_FILES_DIR:-/app/demos}
     volumes:
-      - ${DEMO_FILES_DIR:-./demo-files}:/app/demos:ro
+      # Host directory (DEMO_FILES_HOST_DIR) maps to container path /app/demos (defaults to ./demo-files if not set)
+      - ${DEMO_FILES_HOST_DIR:-./demo-files}:/app/demos:ro
     depends_on:
       - keycloak
     restart: unless-stopped

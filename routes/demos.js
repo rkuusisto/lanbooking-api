@@ -19,35 +19,31 @@ const asyncHandler =
   };
 
 // Get all demo matches or matches by tournament
-// Returns array of matches (frontend-compatible format)
 router.get(
   '/matches',
   asyncHandler(async (req, res) => {
     const { tournamentId } = req.query;
     
     if (tournamentId) {
-      const matches = await demoService.getDemoMatchesByTournament(tournamentId);
+      const matches = await demoService.getDemoMatchesByTournamentPublic(tournamentId);
       return res.json(matches);
     }
     
-    const matches = await demoService.getDemoMatches();
+    const matches = await demoService.getDemoMatchesPublic();
     res.json(matches);
   })
 );
 
-// Get full demo data structure (with schemaVersion)
-// Matches README schema format
+// Get full demo data structure with schemaVersion
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const data = await demoService.getDemoData();
+    const data = await demoService.getDemoDataPublic();
     res.json(data);
   })
 );
 
-// Download handler for demo files
-// Uses match ID for indirect file access (prevents path traversal) and friendly download names
-// Serves files from Docker volume mapped to DEMO_FILES_DIR (default: /app/demos)
+// Download demo files by match ID
 router.get(
   '/d/:id',
   asyncHandler(async (req, res) => {
@@ -81,9 +77,18 @@ router.get(
       return res.status(400).json({ error: 'Demo file unavailable' });
     }
 
-    const demoFilesDir = process.env.DEMO_FILES_DIR || '/app/demos';
-    const filePath = path.join(demoFilesDir, filename);
+    // Defensive check for match.id
+    if (!match.id) {
+      return res.status(500).json({ error: 'Match ID missing' });
+    }
 
+    // Path traversal protection: prevent directory traversal sequences
+    if (match.id.includes('..') || filename.includes('..')) {
+      return res.status(400).json({ error: 'Invalid path' });
+    }
+
+    const demoFilesDir = '/app/demos';
+    const filePath = path.join(demoFilesDir, match.id, filename);
     try {
       // Check if file exists
       await fs.access(filePath);
@@ -122,7 +127,7 @@ router.get(
 router.get(
   '/matches/:id',
   asyncHandler(async (req, res) => {
-    const match = await demoService.getDemoMatchById(req.params.id);
+    const match = await demoService.getDemoMatchByIdPublic(req.params.id);
     if (!match) {
       return res.status(404).json({ error: 'Demo match not found' });
     }
