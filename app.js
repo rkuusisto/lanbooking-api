@@ -19,6 +19,7 @@ import lanregistrationRouter from './routes/lanregistration.js';
 import lanFeedbackRouter from './routes/lanfeedback.js';
 import lanTodoRouter from './routes/lantodo.js';
 import demosRouter from './routes/demos.js';
+import demoParserRouter from './routes/demoParser.js';
 
 let app = express();
 
@@ -51,6 +52,9 @@ app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
 app.use('/api/v1/demos', demosRouter);
+// Demo parser endpoints - routes define full paths starting with /demo-matches
+// Final URLs: /api/v1/demo-matches, /api/v1/demo-matches/:id/players, etc.
+app.use('/api/v1', demoParserRouter);
 app.use('/api/v1/intra', requireAuth, intraRouter);
 
 // catch 404 and forward to error handler
