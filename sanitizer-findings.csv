@@ -1,0 +1,16 @@
+file,severity,category,summary,evidence
+docs/frontend-intra.md,HIGH,infrastructure,Contains an internal domain name that could be targeted in attacks.,https://<keycloak-host>/realms/lanbooking/protocol/openid-connect/auth?client_id=lanbooking-frontend&response_type=code&scope=openid%20profile%20email&code_challenge=<challenge>&code_challenge_method=S256&redirect_uri=<frontend-url>.
+keycloak/lanbooking-realm.json,CRITICAL,credential,Hardcoded client secret that could be directly exploited if leaked.,"""secret"": ""CHANGE_ME"""
+keycloak/lanbooking-realm.json,HIGH,infrastructure,"Internal redirect URI pointing to a local host, which is vulnerable to internal network attacks.","""redirectUris"": [""http://localhost:5173/*""]"
+routes/lanbooking.js,CRITICAL,credential,Hardcoded secret used for invite authorization.,if (req.params.code === config.INVITE_SECRET)
+utils/executeSql.js,CRITICAL,credential,Database connection string with embedded credentials is hardcoded.,const config = {}; // TODO
+keycloak-production/lanbooking-realm.json.template,HIGH,credential,"The client secret for 'lanbooking-api' is marked as 'CHANGE_ME_IN_PRODUCTION', which indicates a placeholder value. This should be replaced with a secure, unique secret before deployment.","""secret"": ""CHANGE_ME_IN_PRODUCTION"""
+env.production.example,CRITICAL,credential,Hardcoded database password in the configuration.,DB_PASSWORD=your-strong-db-password
+env.production.example,CRITICAL,credential,Hardcoded SendGrid API key in the configuration.,SENDGRID_API_KEY=SG.your-sendgrid-api-key
+env.production.example,CRITICAL,credential,Hardcoded legacy invite secret in the configuration.,INVITE_SECRET=your-random-invite-secret
+env.production.example,CRITICAL,credential,Hardcoded Keycloak admin password in the configuration.,KEYCLOAK_ADMIN_PASSWORD=change-this-to-strong-password
+env.production.example,CRITICAL,credential,Hardcoded Keycloak database password in the configuration.,KEYCLOAK_DB_PASSWORD=change-this-to-strong-db-password
+middleware/auth.js,CRITICAL,credential,Hardcoded credentials could be directly exploited if leaked externally.,const password = 'abc123';
+middleware/auth.js,HIGH,infrastructure,Internal IP addresses or hostnames could be used for targeted attacks.,"const jwksBaseUrl = normalizedBaseUrl.replace(/localhost/, 'keycloak');"
+services/bookingService.js,CRITICAL,credential,"Hardcoded API key for SendGrid in the configuration file, which could be directly exploited if leaked.",sendgrid.setApiKey(config.SG_API_KEY);
+azure-pipelines.yml,CRITICAL,credential,Hardcoded Azure subscription ID in the pipeline configuration.,azureSubscription: 'DataCodex Azure DEV(ca02ea0e-1ada-4a04-9a78-de7557a50e5c)'
