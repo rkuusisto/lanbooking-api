@@ -15,6 +15,7 @@ const shared = {
   KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,
   KEYCLOAK_AUDIENCE: process.env.KEYCLOAK_AUDIENCE,
   KEYCLOAK_REQUIRED_ROLE: process.env.KEYCLOAK_REQUIRED_ROLE,
+  STEAM_API_KEY: process.env.STEAM_API_KEY,
 };
 
 export default {

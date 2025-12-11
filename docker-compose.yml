@@ -23,6 +23,7 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
       - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
       - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
+      - STEAM_API_KEY=${STEAM_API_KEY}
     volumes:
       # Host directory (DEMO_FILES_HOST_DIR) maps to container path /app/demos (defaults to ./demo-files if not set)
       - ${DEMO_FILES_HOST_DIR:-./demo-files}:/app/demos:ro
