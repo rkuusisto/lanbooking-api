@@ -2,6 +2,33 @@ import { Request, TYPES } from 'tedious';
 import azureSqlConnection from '../utils/azureSqlConnection.js';
 
 class RegistrationService {
+    // Helper function to normalize TinyInt values
+    // Handles frontend's weird boolean format: ["on"] for true, undefined for false
+    // Also converts undefined, null, empty strings, or string numbers to valid TinyInt values
+    normalizeTinyInt(value) {
+        // Handle frontend's boolean format: array with ["on"] means true
+        if (Array.isArray(value)) {
+            if (value.length > 0 && value[0] === 'on') {
+                return 1;
+            }
+            // Empty array or other values -> false
+            return 0;
+        }
+        
+        // Handle undefined/null/empty -> false (0)
+        if (value === null || value === undefined || value === '') {
+            return 0;
+        }
+        
+        // Try to convert to number
+        const num = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+        if (isNaN(num)) {
+            return 0;
+        }
+        // Ensure value is within TinyInt range (0-255)
+        return Math.max(0, Math.min(255, num));
+    }
+
     register(model, callback) {
         var connection = azureSqlConnection.connect();
 
@@ -49,31 +76,31 @@ class RegistrationService {
                 request.addParameter('email', TYPES.NVarChar, model.email);
                 request.addParameter('parentName', TYPES.NVarChar, model.huoltajaNimi);
                 request.addParameter('parentPhone', TYPES.NVarChar, model.huoltajaPuhelin);
-                request.addParameter('devicePC', TYPES.TinyInt, model.mukaanPc);
-                request.addParameter('deviceConsole', TYPES.TinyInt, model.mukaanKonsoli);
-                request.addParameter('deviceHanging', TYPES.TinyInt, model.mukaanHengailu);
-                request.addParameter('deviceOther', TYPES.TinyInt, model.mukaanMuuta);
+                request.addParameter('devicePC', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanPc));
+                request.addParameter('deviceConsole', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanKonsoli));
+                request.addParameter('deviceHanging', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanHengailu));
+                request.addParameter('deviceOther', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanMuuta));
                 request.addParameter('deviceOtherComment', TYPES.NVarChar, model.mukaanMuutaKommentti);
-                request.addParameter('attendingThu', TYPES.TinyInt, model.osallistumisToPe);
-                request.addParameter('attendingFri', TYPES.TinyInt, model.osallistumisPeLa);
-                request.addParameter('tournamentBS', TYPES.TinyInt, model.turnausBS);
-                request.addParameter('tournamentOW', TYPES.TinyInt, model.turnausOW);
-                request.addParameter('tournamentLOL', TYPES.TinyInt, model.turnausLOL);
-                request.addParameter('tournamentMC', TYPES.TinyInt, model.turnausMC);
-                request.addParameter('tournamentCS', TYPES.TinyInt, model.turnausCS);
-                request.addParameter('tournamentTetris', TYPES.TinyInt, model.turnausTetris);
-                request.addParameter('tournamentNerf', TYPES.TinyInt, model.turnausNerf);
-                request.addParameter('tournamentTableFB', TYPES.TinyInt, model.turnausTableFB);
-                request.addParameter('tournamentTableTennis', TYPES.TinyInt, model.turnausTableTennis);
-                request.addParameter('tournamentBiljard', TYPES.TinyInt, model.turnausBiljari);
-                request.addParameter('tournamentOther', TYPES.TinyInt, model.turnausMuuta);
+                request.addParameter('attendingThu', TYPES.TinyInt, this.normalizeTinyInt(model.osallistumisToPe));
+                request.addParameter('attendingFri', TYPES.TinyInt, this.normalizeTinyInt(model.osallistumisPeLa));
+                request.addParameter('tournamentBS', TYPES.TinyInt, this.normalizeTinyInt(model.turnausBS));
+                request.addParameter('tournamentOW', TYPES.TinyInt, this.normalizeTinyInt(model.turnausOW));
+                request.addParameter('tournamentLOL', TYPES.TinyInt, this.normalizeTinyInt(model.turnausLOL));
+                request.addParameter('tournamentMC', TYPES.TinyInt, this.normalizeTinyInt(model.turnausMC));
+                request.addParameter('tournamentCS', TYPES.TinyInt, this.normalizeTinyInt(model.turnausCS));
+                request.addParameter('tournamentTetris', TYPES.TinyInt, this.normalizeTinyInt(model.turnausTetris));
+                request.addParameter('tournamentNerf', TYPES.TinyInt, this.normalizeTinyInt(model.turnausNerf));
+                request.addParameter('tournamentTableFB', TYPES.TinyInt, this.normalizeTinyInt(model.turnausTableFB));
+                request.addParameter('tournamentTableTennis', TYPES.TinyInt, this.normalizeTinyInt(model.turnausTableTennis));
+                request.addParameter('tournamentBiljard', TYPES.TinyInt, this.normalizeTinyInt(model.turnausBiljari));
+                request.addParameter('tournamentOther', TYPES.TinyInt, this.normalizeTinyInt(model.turnausMuuta));
                 request.addParameter('tournamentOtherComment', TYPES.NVarChar, model.turnausMuutaKommentti);
-                request.addParameter('food', TYPES.TinyInt, model.ruoka);
-                request.addParameter('diet', TYPES.TinyInt, model.ruokaKaikki);
-                request.addParameter('dietL', TYPES.TinyInt, model.ruokaLaktoositon);
-                request.addParameter('dietG', TYPES.TinyInt, model.ruokaGluteeniton);
-                request.addParameter('dietV', TYPES.TinyInt, model.ruokaVegaani);
-                request.addParameter('dietOther', TYPES.TinyInt, model.ruokaMuu);
+                request.addParameter('food', TYPES.TinyInt, this.normalizeTinyInt(model.ruoka));
+                request.addParameter('diet', TYPES.TinyInt, this.normalizeTinyInt(model.ruokaKaikki));
+                request.addParameter('dietL', TYPES.TinyInt, this.normalizeTinyInt(model.ruokaLaktoositon));
+                request.addParameter('dietG', TYPES.TinyInt, this.normalizeTinyInt(model.ruokaGluteeniton));
+                request.addParameter('dietV', TYPES.TinyInt, this.normalizeTinyInt(model.ruokaVegaani));
+                request.addParameter('dietOther', TYPES.TinyInt, this.normalizeTinyInt(model.ruokaMuu));
                 request.addParameter('dietOtherComment', TYPES.NVarChar, model.ruokaMuuKommentti);
                 request.addParameter('nickname', TYPES.NVarChar, model.nickname);
                 request.addParameter('steamId', TYPES.NVarChar, model.steamId);
