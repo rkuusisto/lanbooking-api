@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lanbooking-api
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SG_BOOKING_TEMPLATE_ID=${SG_BOOKING_TEMPLATE_ID}
+      - SG_INVITE_TEMPLATE_ID=${SG_INVITE_TEMPLATE_ID}
+      - INVITE_SECRET=${INVITE_SECRET}
+      - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-http://keycloak:8080}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-lanbooking}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
+      - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
+      - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
+      - STEAM_API_KEY=${STEAM_API_KEY}
+    volumes:
+      # Host directory (DEMO_FILES_HOST_DIR) maps to container path /app/demos (defaults to ./demo-files if not set)
+      - ${DEMO_FILES_HOST_DIR:-./demo-files}:/app/demos:ro
+    depends_on:
+      - keycloak
+    restart: unless-stopped
+    networks:
+      - default  # Internal network for communication with keycloak and keycloak-db
+      - lanbooking-network  # External shared network for communication with other services (e.g., cs2-demo-uploader)
+
+  keycloak:
+    build:
+      context: .
+      dockerfile: Dockerfile.keycloak
+    container_name: lanbooking-keycloak
+    environment:
+      - KEYCLOAK_MODE=${KEYCLOAK_MODE:-production}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_DB=postgres
+      - KC_DB_USERNAME=${KEYCLOAK_DB_USER:-keycloak}
+      - KC_DB_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      - KC_PROXY=edge
+      - KC_HOSTNAME=${KEYCLOAK_HOSTNAME}
+      # Hostname validation settings - Set to false in development if accessing via localhost/IP
+      # In production, keep true for security (prevents host header injection attacks)
+      - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT:-true}
+      - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS:-true}
+      - KC_HTTP_ENABLED=${KEYCLOAK_HTTP_ENABLED:-true}
+      - KC_HTTP_PORT=8080
+    ports:
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ${KEYCLOAK_REALM_DIR:-./keycloak}:/opt/keycloak/data/import
+      - keycloak-server-data:/opt/keycloak/data
+      - ./keycloak-entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
+    depends_on:
+      - keycloak-db
+    restart: unless-stopped
+
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: lanbooking-keycloak-db
+    environment:
+      - POSTGRES_DB=${KEYCLOAK_DB_NAME:-keycloak}
+      - POSTGRES_USER=${KEYCLOAK_DB_USER:-keycloak}
+      - POSTGRES_PASSWORD=${KEYCLOAK_DB_PASSWORD:-keycloak}
+    volumes:
+      - keycloak-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  keycloak-data:
+  keycloak-server-data:
+
+networks:
+  # External shared network for inter-service communication
+  # This allows external services (like cs2-demo-uploader) to communicate with lanbooking-api
+  # Other services can join this network to access the API endpoints
+  # Usage: docker network create lanbooking-network (run once before starting services)
+  lanbooking-network:
+    name: lanbooking-network
+    external: true
+

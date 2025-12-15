@@ -104,3 +104,10 @@ dist
 .tern-port
 dist/
 sendgrid.cmd
+
+.idea
+
+# Production Keycloak realm configuration (copy from template and configure)
+keycloak-production/lanbooking-realm.json
+
+demo-files/
