@@ -1,18 +1,26 @@
-﻿import debug from 'debug';
+﻿import dotenv from 'dotenv';
+import debug from 'debug';
 import express from 'express';
 import path from 'path';
 import logger from 'morgan';
 import cookieParser from 'cookie-parser';
 import createError from 'http-errors';
 import http from 'http';
+import { fileURLToPath } from 'url';
 
-import indexRouter from './routes/index';
-import lanbookingRouter from './routes/lanbooking';
-import lanregistrationRouter from './routes/lanregistration';
-import lanFeedbackRouter from './routes/lanfeedback';
-import lanTodoRouter from './routes/lantodo';
+// Lataa .env tiedosto heti alussa
+dotenv.config();
+
+import indexRouter from './routes/index.js';
+import lanbookingRouter from './routes/lanbooking.js';
+import lanregistrationRouter from './routes/lanregistration.js';
+import lanFeedbackRouter from './routes/lanfeedback.js';
+import lanTodoRouter from './routes/lantodo.js';
 
 let app = express();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

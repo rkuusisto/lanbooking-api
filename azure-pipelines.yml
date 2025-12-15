@@ -14,22 +14,25 @@ variables:
 stages:
 - stage: Build
   displayName: Build stage
-  jobs:  
+  jobs:
   - job: Build
     displayName: Build
     pool:
       vmImage: $(vmImageName)
 
     steps:
-    - script: |
-        npm install
-        npm run build
-      displayName: NPM install and build
+    - task: NodeTool@0
+      inputs:
+        versionSource: 'spec'
+        versionSpec: '20.x'
+
+    - script: npm install
+      displayName: NPM install
 
     - task: ArchiveFiles@2
       displayName: 'Archive files'
       inputs:
-        rootFolderOrFile: '$(System.DefaultWorkingDirectory)/dist'
+        rootFolderOrFile: '$(System.DefaultWorkingDirectory)'
         includeRootFolder: false
         archiveType: zip
         archiveFile: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
@@ -60,5 +63,5 @@ stages:
               appType: 'webAppLinux'
               WebAppName: 'lanbooking-api'
               packageForLinux: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
-              RuntimeStack: 'NODE|18-lts'
+              RuntimeStack: 'NODE|20-lts'
               StartupCommand: 'npm start'

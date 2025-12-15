@@ -1,5 +1,5 @@
 import { Request, TYPES } from 'tedious';
-import azureSqlConnection from '../utils/azureSqlConnection';
+import azureSqlConnection from '../utils/azureSqlConnection.js';
 
 class TodoService {
   getTodos(callback) {
@@ -39,6 +39,7 @@ class TodoService {
     });
 
     connection.connect();
+    connection.close();
   }
 
   store(model, callback) {
@@ -82,6 +83,7 @@ class TodoService {
     });
 
     connection.connect();
+    connection.close();
   }
 }
 
