@@ -10,7 +10,6 @@ import {dirname} from 'path';
 
 import indexRouter from './routes/index.js';
 import intraRouter from './routes/intra.js';
-import { requireAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -66,10 +65,9 @@ app.use('/api/v1', demoParserRouter);
 // Match analytics API - cached statistical analysis
 // Final URLs: /api/v1/analytics/matches/:id, /api/v1/analytics/matches/:id/mvp, etc.
 app.use('/api/v1/analytics', matchAnalyticsRouter);
-// Steam API - requires authentication
-// Final URL: /api/steam/user/:steamId
-app.use('/api/steam', steamRouter);
-app.use('/api/v1/intra', requireAuth, intraRouter);
+
+app.use('/api/v1/steam', steamRouter);
+app.use('/api/v1/intra', intraRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
