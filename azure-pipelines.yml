@@ -24,7 +24,7 @@ stages:
     - task: NodeTool@0
       inputs:
         versionSource: 'spec'
-        versionSpec: '20.x'
+        versionSpec: '24.x'
 
     - script: npm install
       displayName: NPM install
@@ -63,5 +63,5 @@ stages:
               appType: 'webAppLinux'
               WebAppName: 'lanbooking-api'
               packageForLinux: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
-              RuntimeStack: 'NODE|20-lts'
+              RuntimeStack: 'NODE|24-lts'
               StartupCommand: 'npm start'

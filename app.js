@@ -18,8 +18,6 @@ import lanbookingRouter from './routes/lanbooking.js';
 import lanregistrationRouter from './routes/lanregistration.js';
 import lanFeedbackRouter from './routes/lanfeedback.js';
 import lanTodoRouter from './routes/lantodo.js';
-import demoParserRouter from './routes/demoParser.js';
-import matchAnalyticsRouter from './routes/matchAnalytics.js';
 import steamRouter from './routes/steam.js';
 import config from './config/config.js';
 
@@ -58,10 +56,6 @@ app.use('/api/v1/lanbooking', lanbookingRouter);
 app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
-app.use('/api/v1', demoParserRouter);
-// Match analytics API - cached statistical analysis
-// Final URLs: /api/v1/analytics/matches/:id, /api/v1/analytics/matches/:id/mvp, etc.
-app.use('/api/v1/analytics', matchAnalyticsRouter);
 // Steam API - requires authentication
 // Final URL: /api/steam/user/:steamId
 app.use('/api/steam', steamRouter);

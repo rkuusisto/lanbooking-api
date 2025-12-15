@@ -1,6 +1,5 @@
 import express from 'express';
 import intraService from '../services/intraService.js';
-import demoService from '../services/demoService.js';
 
 const router = express.Router();
 
@@ -206,61 +205,5 @@ router.delete(
   })
 );
 
-// Demo Matches (admin operations)
-router.get(
-  '/demos/matches',
-  asyncHandler(async (req, res) => {
-    const { tournamentId } = req.query;
-    
-    let matches;
-    if (tournamentId) {
-      matches = await demoService.getDemoMatchesByTournament(tournamentId);
-    } else {
-      matches = await demoService.getDemoMatches();
-    }
-    
-    res.json({ data: matches });
-  })
-);
-
-router.post(
-  '/demos/matches',
-  asyncHandler(async (req, res) => {
-    const matchData = req.body ?? {};
-    
-    // Validate required fields
-    if (!matchData.tournamentId) {
-      return res.status(400).json({ 
-        error: 'Missing required: tournamentId' 
-      });
-    }
-    
-    const match = await demoService.createDemoMatch(matchData);
-    res.status(201).json({ data: match });
-  })
-);
-
-router.put(
-  '/demos/matches/:id',
-  asyncHandler(async (req, res) => {
-    const matchData = req.body ?? {};
-    const match = await demoService.updateDemoMatch(req.params.id, matchData);
-    if (!match) {
-      return res.status(404).json({ error: 'Demo match not found' });
-    }
-    return res.json({ data: match });
-  })
-);
-
-router.delete(
-  '/demos/matches/:id',
-  asyncHandler(async (req, res) => {
-    const deleted = await demoService.deleteDemoMatch(req.params.id);
-    if (!deleted) {
-      return res.status(404).json({ error: 'Demo match not found' });
-    }
-    return res.status(204).send();
-  })
-);
 
 export default router;
