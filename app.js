@@ -10,7 +10,6 @@ import {dirname} from 'path';
 
 import indexRouter from './routes/index.js';
 import intraRouter from './routes/intra.js';
-import { requireAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
