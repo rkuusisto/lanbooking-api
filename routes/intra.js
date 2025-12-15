@@ -1,5 +1,6 @@
 import express from 'express';
 import intraService from '../services/intraService.js';
+import {requireAuth} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ const asyncHandler =
 // Registrations
 router.get(
   '/registrations',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const data = await intraService.getRegistrations();
     res.json({ data });
@@ -27,6 +29,7 @@ router.get(
 
 router.get(
   '/registrations/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.getRegistrationById(req.params.id);
     if (!record) {
@@ -38,6 +41,7 @@ router.get(
 
 router.post(
   '/registrations',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const payload = req.body ?? {};
     const record = await intraService.createRegistration(payload);
@@ -47,6 +51,7 @@ router.post(
 
 router.put(
   '/registrations/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const payload = req.body ?? {};
     const record = await intraService.updateRegistration(
@@ -62,6 +67,7 @@ router.put(
 
 router.delete(
   '/registrations/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const deleted = await intraService.deleteRegistration(req.params.id);
     if (!deleted) {
@@ -74,6 +80,7 @@ router.delete(
 // Bookings
 router.get(
   '/bookings',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const data = await intraService.getBookings();
     res.json({ data });
@@ -82,6 +89,7 @@ router.get(
 
 router.get(
   '/bookings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.getBookingById(req.params.id);
     if (!record) {
@@ -93,6 +101,7 @@ router.get(
 
 router.post(
   '/bookings',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const payload = req.body ?? {};
     const record = await intraService.createBooking(payload);
@@ -102,6 +111,7 @@ router.post(
 
 router.put(
   '/bookings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const payload = req.body ?? {};
     const record = await intraService.updateBooking(req.params.id, payload);
@@ -114,6 +124,7 @@ router.put(
 
 router.patch(
   '/bookings/:id/billing',
+    requireAuth,
   asyncHandler(async (req, res) => {
     if (typeof req.body?.done === 'undefined') {
       return res
@@ -132,6 +143,7 @@ router.patch(
 
 router.delete(
   '/bookings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const deleted = await intraService.deleteBooking(req.params.id);
     if (!deleted) {
@@ -144,6 +156,7 @@ router.delete(
 // Settings
 router.get(
   '/settings',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const data = await intraService.getSettings();
     res.json({ data });
@@ -152,6 +165,7 @@ router.get(
 
 router.get(
   '/settings/current',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.getLatestSetting();
     if (!record) {
@@ -163,6 +177,7 @@ router.get(
 
 router.get(
   '/settings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.getSettingById(req.params.id);
     if (!record) {
@@ -174,6 +189,7 @@ router.get(
 
 router.post(
   '/settings',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.createSetting(req.body ?? {});
     res.status(201).json({ data: record });
@@ -182,6 +198,7 @@ router.post(
 
 router.put(
   '/settings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.updateSetting(
       req.params.id,
@@ -196,6 +213,7 @@ router.put(
 
 router.delete(
   '/settings/:id',
+    requireAuth,
   asyncHandler(async (req, res) => {
     const deleted = await intraService.deleteSetting(req.params.id);
     if (!deleted) {

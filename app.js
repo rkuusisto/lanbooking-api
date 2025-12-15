@@ -56,10 +56,9 @@ app.use('/api/v1/lanbooking', lanbookingRouter);
 app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
-// Steam API - requires authentication
-// Final URL: /api/steam/user/:steamId
-app.use('/api/steam', steamRouter);
-app.use('/api/v1/intra', requireAuth, intraRouter);
+
+app.use('/api/v1/steam', steamRouter);
+app.use('/api/v1/intra', intraRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
