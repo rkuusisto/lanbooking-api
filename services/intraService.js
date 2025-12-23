@@ -1,10 +1,13 @@
 import { Request, TYPES } from 'tedious';
 import azureSqlConnection from '../utils/azureSqlConnection.js';
+import { v4 as uuidv4 } from 'uuid';
+import { normalizePhone } from '../utils/phoneUtils.js';
 
 const TABLES = {
   REGISTRATION: '[Lanregistration]',
   BOOKING: '[Lanbooking]',
   SETTINGS: '[LanSettings]',
+  CONTACTS: '[contacts]',
 };
 
 const field = (column, type, options = {}) => ({
@@ -73,8 +76,27 @@ const SETTINGS_FIELDS = {
     formatter: value => (value ? value.toISOString().split('T')[0] : null),
   }),
   eventName: field('EventName', TYPES.NVarChar, { required: true }),
+  registrationEnabled: field('RegistrationEnabled', TYPES.Bit, { boolean: true }),
+  bookingEnabled: field('BookingEnabled', TYPES.Bit, { boolean: true }),
   attendancePerDayEnabled: field('AttendancePerDayEnabled', TYPES.Bit, { boolean: true }),
   foodEnabled: field('FoodEnabled', TYPES.Bit, { boolean: true }),
+  announcement: field('Announcement', TYPES.NVarChar),
+  appTitle: field('app_title', TYPES.NVarChar),
+  organizerName: field('organizer_name', TYPES.NVarChar),
+  venueName: field('venue_name', TYPES.NVarChar),
+  venueAddress: field('venue_address', TYPES.NVarChar),
+  logoPath: field('logo_path', TYPES.NVarChar),
+  linksWebsite: field('links_website', TYPES.NVarChar),
+  pricingStandardSeatPrice: field('pricing_standard_seat_price', TYPES.Decimal),
+  pricingPremiumSeatPrice: field('pricing_premium_seat_price', TYPES.Decimal),
+  pricingStandardSeatDimensions: field('pricing_standard_seat_dimensions', TYPES.NVarChar),
+  pricingPremiumSeatDimensions: field('pricing_premium_seat_dimensions', TYPES.NVarChar),
+  pricingStandardSeatLabel: field('pricing_standard_seat_label', TYPES.NVarChar),
+  pricingPremiumSeatLabel: field('pricing_premium_seat_label', TYPES.NVarChar),
+  paymentMobilePayNumber: field('payment_mobile_pay_number', TYPES.NVarChar),
+  paymentBankAccount: field('payment_bank_account', TYPES.NVarChar),
+  paymentBankAccountHolder: field('payment_bank_account_holder', TYPES.NVarChar),
+  paymentInstructions: field('payment_instructions', TYPES.NVarChar),
   createdAt: field('CreatedAt', TYPES.DateTime, {
     readOnly: true,
     formatter: value => (value ? value.toISOString() : null),
@@ -85,10 +107,29 @@ const SETTINGS_FIELDS = {
   }),
 };
 
+const CONTACT_FIELDS = {
+  role: field('role', TYPES.NVarChar, { required: true }),
+  name: field('name', TYPES.NVarChar, { required: true }),
+  phone: field('phone', TYPES.NVarChar),
+  email: field('email', TYPES.NVarChar),
+  notes: field('notes', TYPES.NVarChar),
+  displayOrder: field('display_order', TYPES.Int),
+  isPublic: field('is_public', TYPES.Bit, { boolean: true }),
+  createdAt: field('created_at', TYPES.DateTime, {
+    readOnly: true,
+    formatter: value => (value ? value.toISOString() : null),
+  }),
+  updatedAt: field('updated_at', TYPES.DateTime, {
+    readOnly: true,
+    formatter: value => (value ? value.toISOString() : null),
+  }),
+};
+
 const columnLookups = {
   registration: buildLookup(REGISTRATION_FIELDS),
   booking: buildLookup(BOOKING_FIELDS),
   settings: buildLookup(SETTINGS_FIELDS),
+  contacts: buildLookup(CONTACT_FIELDS),
 };
 
 function buildLookup(map) {
@@ -245,6 +286,14 @@ function transformInputValue(value, cfg, key) {
     return parsed;
   }
 
+  if (cfg.type === TYPES.Decimal) {
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      throw createHttpError(400, `Invalid decimal number for ${key}`);
+    }
+    return parsed;
+  }
+
   if (cfg.type === TYPES.BigInt) {
     if (typeof value === 'bigint') {
       return value.toString();
@@ -318,6 +367,111 @@ function ensureId(value) {
     throw createHttpError(400, 'Id must be a positive integer');
   }
   return String(value);
+}
+
+function validateEmail(email) {
+  if (!email) return true; // Optional field
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw createHttpError(400, 'Invalid email format');
+  }
+  return true;
+}
+
+function validateUrl(url) {
+  if (!url) return true; // Optional field
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    throw createHttpError(400, 'Invalid URL format');
+  }
+}
+
+function validatePhone(phone) {
+  if (!phone) return null; // Optional field
+  
+  // Normalize the phone number
+  const normalized = normalizePhone(phone);
+  
+  // Validation: must start with +, followed by 1-3 digit country code, then more digits
+  const phoneRegex = /^\+\d{1,3}\d+$/;
+  if (!phoneRegex.test(normalized)) {
+    throw createHttpError(400, 'Invalid phone number format');
+  }
+  
+  return normalized;
+}
+
+function validateIban(iban) {
+  if (!iban) return true; // Optional field
+  // Basic IBAN validation - should start with 2 letters followed by digits
+  const ibanRegex = /^[A-Z]{2}\d{2}[\dA-Z\s]+$/i;
+  if (!ibanRegex.test(iban)) {
+    throw createHttpError(400, 'Invalid IBAN format');
+  }
+  return true;
+}
+
+function validateSettings(payload) {
+  // Validate eventName length
+  if (payload.eventName && payload.eventName.length > 255) {
+    throw createHttpError(400, 'eventName must be 255 characters or less');
+  }
+
+  // Validate dates
+  if (payload.startDate && payload.endDate) {
+    const start = new Date(payload.startDate);
+    const end = new Date(payload.endDate);
+    if (end < start) {
+      throw createHttpError(400, 'endDate must be greater than or equal to startDate');
+    }
+  }
+
+  // Validate pricing
+  if (payload.pricingStandardSeatPrice !== undefined && payload.pricingStandardSeatPrice < 0) {
+    throw createHttpError(400, 'pricingStandardSeatPrice must be >= 0');
+  }
+  if (payload.pricingPremiumSeatPrice !== undefined && payload.pricingPremiumSeatPrice < 0) {
+    throw createHttpError(400, 'pricingPremiumSeatPrice must be >= 0');
+  }
+
+  // Validate URLs
+  if (payload.linksWebsite) {
+    validateUrl(payload.linksWebsite);
+  }
+
+  // Validate IBAN
+  if (payload.paymentBankAccount) {
+    validateIban(payload.paymentBankAccount);
+  }
+}
+
+function validateContact(contact) {
+  // Validate role length
+  if (contact.role && contact.role.length > 50) {
+    throw createHttpError(400, 'role must be 50 characters or less');
+  }
+
+  // Validate name length
+  if (contact.name && contact.name.length > 255) {
+    throw createHttpError(400, 'name must be 255 characters or less');
+  }
+
+  // Validate email
+  if (contact.email) {
+    validateEmail(contact.email);
+  }
+
+  // Validate and normalize phone
+  if (contact.phone) {
+    contact.phone = validatePhone(contact.phone);
+  }
+
+  // Validate displayOrder
+  if (contact.displayOrder !== undefined && contact.displayOrder < 0) {
+    throw createHttpError(400, 'displayOrder must be >= 0');
+  }
 }
 
 async function getRegistrations() {
@@ -475,7 +629,14 @@ async function getSettings() {
   const { rows } = await execute(
     `SELECT * FROM ${TABLES.SETTINGS} ORDER BY Id DESC`
   );
-  return serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings);
+  const entities = serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings);
+  
+  // Add contacts to each setting
+  for (const setting of entities) {
+    setting.contacts = await getContactsBySettingsId(setting.id, true);
+  }
+  
+  return entities;
 }
 
 async function getSettingById(id) {
@@ -485,7 +646,77 @@ async function getSettingById(id) {
     [{ name: 'id', type: TYPES.Int, value: Number(safeId) }]
   );
   const entities = serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings);
-  return entities[0] || null;
+  const setting = entities[0] || null;
+  
+  if (setting) {
+    setting.contacts = await getContactsBySettingsId(setting.id, true);
+  }
+  
+  return setting;
+}
+
+async function getContactsBySettingsId(settingsId, includePrivate = true) {
+  const params = [{ name: 'settingsId', type: TYPES.Int, value: Number(settingsId) }];
+  let query = `SELECT * FROM ${TABLES.CONTACTS} WHERE settings_id = @settingsId`;
+  
+  if (!includePrivate) {
+    query += ' AND is_public = 1';
+  }
+  
+  query += ' ORDER BY display_order ASC';
+  
+  const { rows } = await execute(query, params);
+  return serializeRows(rows, CONTACT_FIELDS, columnLookups.contacts);
+}
+
+async function createContacts(settingsId, contacts) {
+  if (!contacts || contacts.length === 0) {
+    return [];
+  }
+
+  // Create contacts one by one to avoid parameter name conflicts
+  const createdContacts = [];
+  
+  for (const contact of contacts) {
+    ensureRequiredFields(contact, CONTACT_FIELDS);
+    
+    const contactId = uuidv4();
+    const { columns, values, params } = buildInsertParts(contact, CONTACT_FIELDS);
+    
+    if (columns.length === 0) {
+      throw createHttpError(400, 'Contact has no valid fields');
+    }
+
+    // Add id and settings_id
+    columns.unshift('[id]', '[settings_id]');
+    values.unshift('@id', '@settingsId');
+    params.unshift(
+      { name: 'id', type: TYPES.NVarChar, value: contactId },
+      { name: 'settingsId', type: TYPES.Int, value: Number(settingsId) }
+    );
+
+    // Add timestamp columns
+    columns.push('[created_at]', '[updated_at]');
+    values.push('SYSDATETIME()', 'SYSDATETIME()');
+
+    const query = `INSERT INTO ${TABLES.CONTACTS} (${columns.join(
+      ', '
+    )}) OUTPUT INSERTED.* VALUES (${values.join(', ')});`;
+
+    const { rows } = await execute(query, params);
+    const entities = serializeRows(rows, CONTACT_FIELDS, columnLookups.contacts);
+    createdContacts.push(entities[0]);
+  }
+
+  return createdContacts;
+}
+
+async function deleteContactsBySettingsId(settingsId) {
+  const { rowCount } = await execute(
+    `DELETE FROM ${TABLES.CONTACTS} WHERE settings_id = @settingsId`,
+    [{ name: 'settingsId', type: TYPES.Int, value: Number(settingsId) }]
+  );
+  return rowCount;
 }
 
 async function getLatestSetting() {
@@ -493,12 +724,23 @@ async function getLatestSetting() {
     `SELECT TOP 1 * FROM ${TABLES.SETTINGS} ORDER BY Id DESC`
   );
   const entities = serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings);
-  return entities[0] || null;
+  const setting = entities[0] || null;
+  
+  if (setting) {
+    setting.contacts = await getContactsBySettingsId(setting.id, true);
+  }
+  
+  return setting;
 }
 
 async function createSetting(payload) {
-  ensureRequiredFields(payload, SETTINGS_FIELDS);
-  const { columns, values, params } = buildInsertParts(payload, SETTINGS_FIELDS);
+  const { contacts, ...settingsData } = payload;
+  
+  // Validate settings
+  validateSettings(settingsData);
+  
+  ensureRequiredFields(settingsData, SETTINGS_FIELDS);
+  const { columns, values, params } = buildInsertParts(settingsData, SETTINGS_FIELDS);
 
   if (columns.length === 0) {
     throw createHttpError(400, 'No settings fields provided');
@@ -513,32 +755,70 @@ async function createSetting(payload) {
 
   const { rows } = await execute(query, params);
   const entities = serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings);
-  return entities[0];
+  const setting = entities[0];
+  
+  // Create contacts if provided
+  if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+    // Validate all contacts
+    contacts.forEach(validateContact);
+    setting.contacts = await createContacts(setting.id, contacts);
+  } else {
+    setting.contacts = [];
+  }
+  
+  return setting;
 }
 
 async function updateSetting(id, payload) {
   const safeId = ensureId(id);
-  const { assignments, params } = buildUpdateParts(payload, SETTINGS_FIELDS);
+  const { contacts, ...settingsData } = payload;
+  
+  // Validate settings
+  validateSettings(settingsData);
+  
+  const { assignments, params } = buildUpdateParts(settingsData, SETTINGS_FIELDS);
 
-  if (assignments.length === 0) {
+  if (assignments.length === 0 && (!contacts || contacts.length === 0)) {
     throw createHttpError(400, 'No fields provided for update');
   }
 
-  assignments.push('[UpdatedAt] = SYSDATETIME()');
-  params.push({ name: 'id', type: TYPES.Int, value: Number(safeId) });
+  // Update settings if there are any changes
+  if (assignments.length > 0) {
+    assignments.push('[UpdatedAt] = SYSDATETIME()');
+    params.push({ name: 'id', type: TYPES.Int, value: Number(safeId) });
 
-  const query = `UPDATE ${TABLES.SETTINGS}
-    SET ${assignments.join(', ')}
-    OUTPUT INSERTED.*
-    WHERE Id = @id;`;
+    const query = `UPDATE ${TABLES.SETTINGS}
+      SET ${assignments.join(', ')}
+      OUTPUT INSERTED.*
+      WHERE Id = @id;`;
 
-  const { rows, rowCount } = await execute(query, params);
+    const { rows, rowCount } = await execute(query, params);
 
-  if (rowCount === 0) {
-    return null;
+    if (rowCount === 0) {
+      return null;
+    }
+  } else {
+    // Verify settings exists
+    const existing = await getSettingById(safeId);
+    if (!existing) {
+      return null;
+    }
   }
 
-  return serializeRows(rows, SETTINGS_FIELDS, columnLookups.settings)[0];
+  // Replace all contacts (Option A from documentation)
+  if (contacts !== undefined) {
+    // Validate all contacts
+    if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+      contacts.forEach(validateContact);
+    }
+    await deleteContactsBySettingsId(safeId);
+    if (contacts && Array.isArray(contacts) && contacts.length > 0) {
+      await createContacts(safeId, contacts);
+    }
+  }
+
+  // Fetch updated settings with contacts
+  return await getSettingById(safeId);
 }
 
 async function deleteSetting(id) {

@@ -1,5 +1,6 @@
 import { Request, TYPES } from 'tedious';
 import azureSqlConnection from '../utils/azureSqlConnection.js';
+import { normalizePhone } from '../utils/phoneUtils.js';
 
 class RegistrationService {
     // Helper function to normalize TinyInt values
@@ -72,10 +73,10 @@ class RegistrationService {
 
                 request.addParameter('firstname', TYPES.NVarChar, model.etunimi);
                 request.addParameter('lastname', TYPES.NVarChar, model.sukunimi);
-                request.addParameter('phone', TYPES.NVarChar, model.puhelin);
+                request.addParameter('phone', TYPES.NVarChar, normalizePhone(model.puhelin));
                 request.addParameter('email', TYPES.NVarChar, model.email);
                 request.addParameter('parentName', TYPES.NVarChar, model.huoltajaNimi);
-                request.addParameter('parentPhone', TYPES.NVarChar, model.huoltajaPuhelin);
+                request.addParameter('parentPhone', TYPES.NVarChar, normalizePhone(model.huoltajaPuhelin));
                 request.addParameter('devicePC', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanPc));
                 request.addParameter('deviceConsole', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanKonsoli));
                 request.addParameter('deviceHanging', TYPES.TinyInt, this.normalizeTinyInt(model.mukaanHengailu));

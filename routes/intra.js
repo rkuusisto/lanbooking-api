@@ -168,9 +168,7 @@ router.get(
     requireAuth,
   asyncHandler(async (req, res) => {
     const record = await intraService.getLatestSetting();
-    if (!record) {
-      return res.status(404).json({ error: 'No settings found' });
-    }
+    // Return null if no settings found (frontend will use defaults)
     return res.json({ data: record });
   })
 );
