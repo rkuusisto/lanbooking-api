@@ -23,12 +23,16 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
       - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
       - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
-      - DEMO_FILES_DIR=${DEMO_FILES_DIR:-/app/demos}
+      - STEAM_API_KEY=${STEAM_API_KEY}
     volumes:
-      - ${DEMO_FILES_DIR:-./demo-files}:/app/demos:ro
+      # Host directory (DEMO_FILES_HOST_DIR) maps to container path /app/demos (defaults to ./demo-files if not set)
+      - ${DEMO_FILES_HOST_DIR:-./demo-files}:/app/demos:ro
     depends_on:
       - keycloak
     restart: unless-stopped
+    networks:
+      - default  # Internal network for communication with keycloak and keycloak-db
+      - lanbooking-network  # External shared network for communication with other services (e.g., cs2-demo-uploader)
 
   keycloak:
     build:
@@ -75,4 +79,13 @@ services:
 volumes:
   keycloak-data:
   keycloak-server-data:
+
+networks:
+  # External shared network for inter-service communication
+  # This allows external services (like cs2-demo-uploader) to communicate with lanbooking-api
+  # Other services can join this network to access the API endpoints
+  # Usage: docker network create lanbooking-network (run once before starting services)
+  lanbooking-network:
+    name: lanbooking-network
+    external: true
 

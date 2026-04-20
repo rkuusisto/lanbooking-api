@@ -15,20 +15,32 @@ if (missing.length > 0) {
 const normalizedBaseUrl = config.KEYCLOAK_BASE_URL.replace(/\/+$/, '');
 const issuer = `${normalizedBaseUrl}/realms/${config.KEYCLOAK_REALM}`;
 
-// For JWKS fetching, always use keycloak service name (works in Docker network)
-// Replace localhost with keycloak for internal Docker network access
-const jwksBaseUrl = normalizedBaseUrl.replace(/localhost/, 'keycloak');
+// For JWKS fetching, handle different URL formats
+// If using host.docker.internal, use as-is (works from containers to host)
+// Otherwise, use keycloak service name for Docker network access
+let jwksBaseUrl = normalizedBaseUrl;
+if (!jwksBaseUrl.includes('host.docker.internal') && !jwksBaseUrl.includes('keycloak')) {
+  // Replace localhost with keycloak for internal Docker network access
+  jwksBaseUrl = jwksBaseUrl.replace(/localhost/, 'keycloak');
+}
 const jwksUri = `${jwksBaseUrl}/realms/${config.KEYCLOAK_REALM}/protocol/openid-connect/certs`;
+console.log('[auth] JWKS URI:', jwksUri);
 const remoteJwks = createRemoteJWKSet(new URL(jwksUri));
 
-// Accept tokens from both localhost (browser perspective) and keycloak (Docker internal) issuers
+// Accept tokens from multiple issuer variants (localhost, keycloak, host.docker.internal)
 const baseUrlVariants = [normalizedBaseUrl];
 if (normalizedBaseUrl.includes('keycloak')) {
   baseUrlVariants.push(normalizedBaseUrl.replace('keycloak', 'localhost'));
+  baseUrlVariants.push(normalizedBaseUrl.replace('keycloak', 'host.docker.internal'));
 } else if (normalizedBaseUrl.includes('localhost')) {
   baseUrlVariants.push(normalizedBaseUrl.replace('localhost', 'keycloak'));
+  baseUrlVariants.push(normalizedBaseUrl.replace('localhost', 'host.docker.internal'));
+} else if (normalizedBaseUrl.includes('host.docker.internal')) {
+  baseUrlVariants.push(normalizedBaseUrl.replace('host.docker.internal', 'localhost'));
+  baseUrlVariants.push(normalizedBaseUrl.replace('host.docker.internal', 'keycloak'));
 }
 const allowedIssuers = baseUrlVariants.map(url => `${url}/realms/${config.KEYCLOAK_REALM}`);
+console.log('[auth] Allowed issuers on startup:', allowedIssuers);
 
 const configuredAudiences = (config.KEYCLOAK_AUDIENCE || '')
   .split(',')
@@ -50,6 +62,47 @@ function hasRequiredRole(payload) {
   );
 }
 
+/**
+ * Shared token verification logic
+ * @param {string} token - JWT token
+ * @returns {Promise<Object>} Verification result with success flag and payload or error
+ */
+async function verifyToken(token) {
+  try {
+    // First verify without issuer check to get the payload
+    const { payload } = await jwtVerify(token, remoteJwks, {
+      audience: configuredAudiences.length > 0 ? configuredAudiences : undefined
+    });
+
+    // Then validate the issuer manually to allow multiple issuer variants
+    if (!allowedIssuers.includes(payload.iss)) {
+      return { success: false, error: 'Invalid token issuer' };
+    }
+
+    if (!hasRequiredRole(payload)) {
+      return { success: false, error: 'Insufficient role' };
+    }
+
+    return {
+      success: true,
+      payload: {
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        roles: payload?.realm_access?.roles || [],
+      }
+    };
+  } catch (error) {
+    if (error.code === 'ERR_JWT_EXPIRED') {
+      return { success: false, error: 'Token expired', code: 'expired' };
+    }
+    return { success: false, error: 'Invalid token', code: 'invalid' };
+  }
+}
+
+/**
+ * Required authentication middleware - rejects requests without valid token
+ */
 export async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.toLowerCase().startsWith('bearer ')) {
@@ -57,35 +110,45 @@ export async function requireAuth(req, res, next) {
   }
 
   const token = authHeader.slice(7).trim();
+  const result = await verifyToken(token);
 
-  try {
-    // First verify without issuer check to get the payload
-    const { payload } = await jwtVerify(token, remoteJwks, {
-      audience: configuredAudiences.length > 0 ? configuredAudiences : undefined
+  if (!result.success) {
+    console.error('Authentication error:', result.error);
+    return res.status(result.error === 'Insufficient role' ? 403 : 401).json({ 
+      error: result.error 
     });
-
-    // Then validate the issuer manually to allow both localhost and keycloak
-    if (!allowedIssuers.includes(payload.iss)) {
-      return res.status(401).json({ error: 'Invalid token issuer' });
-    }
-
-    if (!hasRequiredRole(payload)) {
-      return res.status(403).json({ error: 'Insufficient role' });
-    }
-
-    req.user = {
-      sub: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      roles: payload?.realm_access?.roles || [],
-    };
-
-    return next();
-  } catch (error) {
-    console.error('Authentication error', error);
-    if (error.code === 'ERR_JWT_EXPIRED') {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    return res.status(401).json({ error: 'Invalid token' });
   }
+
+  req.user = result.payload;
+  return next();
+}
+
+/**
+ * Optional authentication middleware - verifies token if present but doesn't fail if missing
+ * Sets req.authenticated = true/false and req.user if authenticated
+ */
+export async function optionalAuth(req, res, next) {
+  req.authenticated = false;
+  req.user = null;
+
+  const authHeader = req.headers.authorization || '';
+  
+  if (!authHeader.toLowerCase().startsWith('bearer ')) {
+    return next(); // No auth header, continue without authentication
+  }
+
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return next(); // Empty token, continue without authentication
+  }
+
+  const result = await verifyToken(token);
+
+  if (result.success) {
+    req.authenticated = true;
+    req.user = result.payload;
+  }
+  // If verification fails, continue without authentication (don't fail the request)
+  
+  return next();
 }

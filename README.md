@@ -77,7 +77,16 @@ For production deployments, configure the following additional environment varia
 - `keycloak` – Keycloak 24 (importing `keycloak/lanbooking-realm.json`)
 - `keycloak-db` – Postgres backing store
 
-To boot everything locally:
+### Docker Network Setup
+
+The API connects to an external Docker network (`lanbooking-network`) to allow inter-service communication with other services like the CS2 demo uploader. Before starting the services for the first time, create the network:
+
+```bash
+# Create the shared network (run once)
+docker network create lanbooking-network
+```
+
+Then boot everything locally:
 
 ```bash
 # Default: runs in production mode
@@ -85,6 +94,11 @@ docker compose up --build
 
 # Or set KEYCLOAK_MODE=dev in your .env file for development mode
 ```
+
+**Network Configuration:**
+- **Internal network (default)**: Used for communication between api, keycloak, and keycloak-db
+- **External network (lanbooking-network)**: Allows external services to communicate with the API
+- Other services (e.g., `cs2-demo-uploader`) can join this network to access the lanbooking-api endpoints
 
 Update the `lanbooking-api` client secret inside `keycloak/lanbooking-realm.json` before importing, or override it directly in Keycloak after the first start. Assign the `intra-admin` role to any users who should access the protected endpoints.
 
