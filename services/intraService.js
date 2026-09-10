@@ -15,6 +15,8 @@ const field = (column, type, options = {}) => ({
   boolean: options.boolean || false,
   readOnly: options.readOnly || false,
   formatter: options.formatter,
+  precision: options.precision,
+  scale: options.scale,
 });
 
 const REGISTRATION_FIELDS = {
@@ -84,6 +86,29 @@ const SETTINGS_FIELDS = {
   eventName: field('EventName', TYPES.NVarChar, { required: true }),
   attendancePerDayEnabled: field('AttendancePerDayEnabled', TYPES.Bit, { boolean: true }),
   foodEnabled: field('FoodEnabled', TYPES.Bit, { boolean: true }),
+  registrationEnabled: field('RegistrationEnabled', TYPES.Bit, { boolean: true }),
+  bookingEnabled: field('BookingEnabled', TYPES.Bit, { boolean: true }),
+  announcement: field('Announcement', TYPES.NVarChar),
+  // Branding fields
+  appTitle: field('AppTitle', TYPES.NVarChar),
+  organizerName: field('OrganizerName', TYPES.NVarChar),
+  logoPath: field('LogoPath', TYPES.NVarChar),
+  linksWebsite: field('LinksWebsite', TYPES.NVarChar),
+  // Location fields
+  venueName: field('VenueName', TYPES.NVarChar),
+  venueAddress: field('VenueAddress', TYPES.NVarChar),
+  // Pricing fields
+  pricingStandardSeatPrice: field('PricingStandardSeatPrice', TYPES.Decimal, { precision: 10, scale: 2 }),
+  pricingPremiumSeatPrice: field('PricingPremiumSeatPrice', TYPES.Decimal, { precision: 10, scale: 2 }),
+  pricingStandardSeatDimensions: field('PricingStandardSeatDimensions', TYPES.NVarChar),
+  pricingPremiumSeatDimensions: field('PricingPremiumSeatDimensions', TYPES.NVarChar),
+  pricingStandardSeatLabel: field('PricingStandardSeatLabel', TYPES.NVarChar),
+  pricingPremiumSeatLabel: field('PricingPremiumSeatLabel', TYPES.NVarChar),
+  // Payment fields
+  paymentMobilePayNumber: field('PaymentMobilePayNumber', TYPES.NVarChar),
+  paymentBankAccount: field('PaymentBankAccount', TYPES.NVarChar),
+  paymentBankAccountHolder: field('PaymentBankAccountHolder', TYPES.NVarChar),
+  paymentInstructions: field('PaymentInstructions', TYPES.NVarChar),
   createdAt: field('CreatedAt', TYPES.DateTime, {
     readOnly: true,
     formatter: value => (value ? value.toISOString() : null),
@@ -133,7 +158,14 @@ function execute(query, parameters = []) {
       });
 
       parameters.forEach(param => {
-        request.addParameter(param.name, param.type, param.value);
+        const options = {};
+        if (param.precision !== undefined) {
+          options.precision = param.precision;
+        }
+        if (param.scale !== undefined) {
+          options.scale = param.scale;
+        }
+        request.addParameter(param.name, param.type, param.value, options);
       });
 
       connection.execSql(request);
@@ -247,7 +279,7 @@ function transformInputValue(value, cfg, key) {
     return normalizeBooleanValue(value, key);
   }
 
-  if (cfg.type === TYPES.Int) {
+  if (cfg.type === TYPES.Int || cfg.type === TYPES.Decimal) {
     const parsed = Number(value);
     if (Number.isNaN(parsed)) {
       throw createHttpError(400, `Invalid number for ${key}`);
@@ -293,7 +325,7 @@ function buildInsertParts(payload, fieldMap) {
     const paramName = `${key}`;
     columns.push(`[${cfg.column}]`);
     values.push(`@${paramName}`);
-    params.push({ name: paramName, type: cfg.type, value: transformed });
+    params.push({ name: paramName, type: cfg.type, value: transformed, precision: cfg.precision, scale: cfg.scale });
   });
 
   return { columns, values, params };
@@ -314,7 +346,7 @@ function buildUpdateParts(payload, fieldMap) {
     const transformed = transformInputValue(payload[key], cfg, key);
     const paramName = `${key}`;
     assignments.push(`[${cfg.column}] = @${paramName}`);
-    params.push({ name: paramName, type: cfg.type, value: transformed });
+    params.push({ name: paramName, type: cfg.type, value: transformed, precision: cfg.precision, scale: cfg.scale });
   });
 
   return { assignments, params };
