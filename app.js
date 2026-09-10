@@ -10,7 +10,6 @@ import {dirname} from 'path';
 
 import indexRouter from './routes/index.js';
 import intraRouter from './routes/intra.js';
-import { requireAuth } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,6 +17,17 @@ import lanbookingRouter from './routes/lanbooking.js';
 import lanregistrationRouter from './routes/lanregistration.js';
 import lanFeedbackRouter from './routes/lanfeedback.js';
 import lanTodoRouter from './routes/lantodo.js';
+import demosRouter from './routes/demos.js';
+import demoParserRouter from './routes/demoParser.js';
+import matchAnalyticsRouter from './routes/matchAnalytics.js';
+import steamRouter from './routes/steam.js';
+import settingsRouter from './routes/settings.js';
+import config from './config/config.js';
+
+// Validate optional configuration at startup
+if (!config.STEAM_API_KEY || config.STEAM_API_KEY.trim() === '') {
+  console.warn('[WARNING] STEAM_API_KEY is not configured. Steam API endpoints will fail at runtime.');
+}
 
 let app = express();
 
@@ -49,7 +59,17 @@ app.use('/api/v1/lanbooking', lanbookingRouter);
 app.use('/api/v1/lanregistration', lanregistrationRouter);
 app.use('/api/v1/lanfeedback', lanFeedbackRouter);
 app.use('/api/v1/lantodo', lanTodoRouter);
-app.use('/api/v1/intra', requireAuth, intraRouter);
+app.use('/api/v1/demos', demosRouter);
+// Demo parser endpoints - routes define full paths starting with /demo-matches
+// Final URLs: /api/v1/demo-matches, /api/v1/demo-matches/:id/players, etc.
+app.use('/api/v1', demoParserRouter);
+// Match analytics API - cached statistical analysis
+// Final URLs: /api/v1/analytics/matches/:id, /api/v1/analytics/matches/:id/mvp, etc.
+app.use('/api/v1/analytics', matchAnalyticsRouter);
+
+app.use('/api/v1/steam', steamRouter);
+app.use('/api/v1/intra', intraRouter);
+app.use('/api/v1', settingsRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

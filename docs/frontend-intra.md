@@ -66,12 +66,41 @@ Responses:
 | GET | `/bookings/:id` | Fetch a single booking. |
 | POST | `/bookings` | Create a booking (requires `email` + `code`). |
 | PUT | `/bookings/:id` | Update email/code/location/invitation/done fields. |
+| POST | `/bookings/:id/swap` | Swap the booking onto an occupied seat. Body: `{ "location": "B7" }`. |
 | PATCH | `/bookings/:id/billing` | Convenience endpoint to toggle the billing `done` flag. |
 | DELETE | `/bookings/:id` | Remove a booking record. |
 
 Billing status:
 - The `done` column mirrors the DDL (`int`). Treat `0` as pending and `1` as paid/handled. The PATCH endpoint expects `{ "done": 1 }` or `{ "done": 0 }` (booleans also work).
 - `invitationSent` is a boolean bit. Defaults to `false` on creation.
+- `PUT /bookings/:id` may set `location` to any free seat, including seats listed in `BlockedLocations`. Assigning a seat already held by another booking returns `409 Location already booked`. Clearing a seat uses `location: null`.
+- `POST /bookings/:id/swap` moves the source booking onto an occupied seat. The previous occupant receives the source booking's old seat, or is cleared if the source had no seat. Returns `{ "source": <booking>, "target": <booking or null> }`.
+
+## Blocked Locations API
+
+Blocked seats cannot be claimed via the public booking API (`POST /api/v1/lanbooking`). Intra can still assign those seats manually.
+
+Requires the `[BlockedLocations]` table. Run [`database/create-blocked-locations-table.sql`](../database/create-blocked-locations-table.sql) against Azure SQL before using these endpoints.
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/blocked-locations` | List blocked seat IDs (ordered by location). |
+| POST | `/blocked-locations` | Block a seat. Body: `{ "location": "A1" }`. |
+| DELETE | `/blocked-locations/:location` | Unblock a seat. |
+
+The public booking map also exposes `GET /api/v1/lanbooking/blocked` (no auth) as a string array of location IDs.
+
+Sample blocked location object:
+
+```json
+{
+  "id": "1",
+  "location": "A1",
+  "createdAt": "2026-09-10T12:00:00.000Z"
+}
+```
+
+`POST` returns `409` if the seat is already blocked. `DELETE` returns `404` if it is not blocked.
 
 ## LAN Settings API
 
@@ -122,7 +151,7 @@ Errors use:
 | --- | --- | --- |
 | email | string | Required, unique per registration. |
 | code | string | Required booking code. |
-| location | string | Seat/table info. |
+| location | string | Seat/table info. Intra may assign blocked seats; public booking may not. |
 | invitationSent | boolean | Whether the invitation email has been sent. |
 | done | integer | Billing status flag (0/1). |
 

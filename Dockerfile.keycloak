@@ -1,0 +1,35 @@
+FROM quay.io/keycloak/keycloak:24.0.5 AS builder
+
+# Build the optimized Keycloak distribution with PostgreSQL database driver
+# This needs to be done at build time for production optimized mode
+WORKDIR /opt/keycloak
+
+# Build with PostgreSQL database driver
+# This adds the PostgreSQL driver to the optimized build
+RUN /opt/keycloak/bin/kc.sh build --db=postgres
+
+# Production image
+FROM quay.io/keycloak/keycloak:24.0.5
+
+WORKDIR /opt/keycloak
+
+# Switch to root to set file permissions
+USER root
+
+# Copy the optimized build from builder
+# The build command creates optimized files in the Keycloak directory
+# We copy the entire directory to preserve all optimized artifacts including the database driver
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+
+# Copy entrypoint script and set permissions
+# (will be overridden by volume mount if provided in docker-compose)
+COPY keycloak-entrypoint.sh /opt/keycloak/entrypoint.sh
+RUN chmod +x /opt/keycloak/entrypoint.sh && \
+    chown keycloak:keycloak -R /opt/keycloak
+
+# Switch back to keycloak user
+USER keycloak
+
+# Use bash to execute entrypoint to handle permission issues with volume mounts
+ENTRYPOINT ["/bin/bash", "/opt/keycloak/entrypoint.sh"]
+

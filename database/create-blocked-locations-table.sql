@@ -1,0 +1,5 @@
+CREATE TABLE [BlockedLocations] (
+    [Id] BIGINT IDENTITY(1,1) PRIMARY KEY,
+    [Location] NVARCHAR(50) NOT NULL UNIQUE,
+    [CreatedAt] DATETIME DEFAULT GETDATE()
+);

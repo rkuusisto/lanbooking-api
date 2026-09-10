@@ -23,15 +23,24 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-lanbooking-api}
       - KEYCLOAK_AUDIENCE=${KEYCLOAK_AUDIENCE}
       - KEYCLOAK_REQUIRED_ROLE=${KEYCLOAK_REQUIRED_ROLE:-intra-admin}
+      - STEAM_API_KEY=${STEAM_API_KEY}
+    volumes:
+      # Host directory (DEMO_FILES_HOST_DIR) maps to container path /app/demos (defaults to ./demo-files if not set)
+      - ${DEMO_FILES_HOST_DIR:-./demo-files}:/app/demos:ro
     depends_on:
       - keycloak
     restart: unless-stopped
+    networks:
+      - default  # Internal network for communication with keycloak and keycloak-db
+      - lanbooking-network  # External shared network for communication with other services (e.g., cs2-demo-uploader)
 
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0.5
+    build:
+      context: .
+      dockerfile: Dockerfile.keycloak
     container_name: lanbooking-keycloak
-    command: ["start", "--optimized", "--import-realm"]
     environment:
+      - KEYCLOAK_MODE=${KEYCLOAK_MODE:-production}
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
       - KC_DB=postgres
@@ -40,15 +49,18 @@ services:
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
       - KC_PROXY=edge
       - KC_HOSTNAME=${KEYCLOAK_HOSTNAME}
+      # Hostname validation settings - Set to false in development if accessing via localhost/IP
+      # In production, keep true for security (prevents host header injection attacks)
       - KC_HOSTNAME_STRICT=${KEYCLOAK_HOSTNAME_STRICT:-true}
       - KC_HOSTNAME_STRICT_HTTPS=${KEYCLOAK_HOSTNAME_STRICT_HTTPS:-true}
       - KC_HTTP_ENABLED=${KEYCLOAK_HTTP_ENABLED:-true}
-      - KC_HTTP_PORT=${KEYCLOAK_HTTP_PORT:-8080}
+      - KC_HTTP_PORT=8080
     ports:
-      - "${KEYCLOAK_HTTP_PORT:-8080}:${KEYCLOAK_HTTP_PORT:-8080}"
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
     volumes:
       - ${KEYCLOAK_REALM_DIR:-./keycloak}:/opt/keycloak/data/import
       - keycloak-server-data:/opt/keycloak/data
+      - ./keycloak-entrypoint.sh:/opt/keycloak/entrypoint.sh:ro
     depends_on:
       - keycloak-db
     restart: unless-stopped
@@ -67,4 +79,13 @@ services:
 volumes:
   keycloak-data:
   keycloak-server-data:
+
+networks:
+  # External shared network for inter-service communication
+  # This allows external services (like cs2-demo-uploader) to communicate with lanbooking-api
+  # Other services can join this network to access the API endpoints
+  # Usage: docker network create lanbooking-network (run once before starting services)
+  lanbooking-network:
+    name: lanbooking-network
+    external: true
 
