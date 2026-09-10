@@ -21,6 +21,7 @@ import demosRouter from './routes/demos.js';
 import demoParserRouter from './routes/demoParser.js';
 import matchAnalyticsRouter from './routes/matchAnalytics.js';
 import steamRouter from './routes/steam.js';
+import settingsRouter from './routes/settings.js';
 import config from './config/config.js';
 
 // Validate optional configuration at startup
@@ -68,6 +69,7 @@ app.use('/api/v1/analytics', matchAnalyticsRouter);
 
 app.use('/api/v1/steam', steamRouter);
 app.use('/api/v1/intra', intraRouter);
+app.use('/api/v1', settingsRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
