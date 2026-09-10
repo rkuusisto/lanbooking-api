@@ -123,6 +123,25 @@ router.put(
   })
 );
 
+router.post(
+  '/bookings/:id/swap',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const location = req.body?.location;
+    if (!location) {
+      return res.status(400).json({ error: 'location is required' });
+    }
+    const result = await intraService.swapBookingLocations(
+      req.params.id,
+      location
+    );
+    if (!result) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    return res.json({ data: result });
+  })
+);
+
 router.patch(
   '/bookings/:id/billing',
     requireAuth,
@@ -149,6 +168,37 @@ router.delete(
     const deleted = await intraService.deleteBooking(req.params.id);
     if (!deleted) {
       return res.status(404).json({ error: 'Booking not found' });
+    }
+    return res.status(204).send();
+  })
+);
+
+// Blocked locations
+router.get(
+  '/blocked-locations',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = await intraService.getBlockedLocations();
+    res.json({ data });
+  })
+);
+
+router.post(
+  '/blocked-locations',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const record = await intraService.createBlockedLocation(req.body ?? {});
+    res.status(201).json({ data: record });
+  })
+);
+
+router.delete(
+  '/blocked-locations/:location',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const deleted = await intraService.deleteBlockedLocation(req.params.location);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Blocked location not found' });
     }
     return res.status(204).send();
   })

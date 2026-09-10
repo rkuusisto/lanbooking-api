@@ -47,46 +47,142 @@ class BookingService {
 
   store(email, code, location, callback) {
     var connection = azureSqlConnection.connect();
+    var finished = false;
 
-    // Attempt to connect and execute queries if connection goes through
+    const fail = error => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      connection.close();
+      callback({ error });
+    };
+
+    const succeed = value => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      connection.close();
+      callback(value);
+    };
+
+    const runUpdate = () => {
+      var request = new Request(
+        'UPDATE [Lanbooking] SET Location = @location WHERE Email = @email AND Code = @code',
+        (err, rowCount) => {
+          if (err) {
+            console.error('request error:');
+            console.log(err);
+            fail('request error');
+            return;
+          }
+          if (rowCount === 0) {
+            fail('no result');
+            return;
+          }
+          succeed(rowCount);
+        }
+      );
+
+      request.addParameter('email', TYPES.NVarChar, email);
+      request.addParameter('code', TYPES.NVarChar, code);
+      request.addParameter('location', TYPES.NVarChar, location);
+      connection.execSql(request);
+    };
+
+    const checkTaken = () => {
+      var request = new Request(
+        'SELECT Id FROM [Lanbooking] WHERE Location = @location AND NOT (Email = @email AND Code = @code)',
+        (err, rowCount) => {
+          if (err) {
+            console.error('request error:');
+            console.log(err);
+            fail('request error');
+            return;
+          }
+          if (rowCount > 0) {
+            fail('location already booked');
+            return;
+          }
+          runUpdate();
+        }
+      );
+
+      request.addParameter('location', TYPES.NVarChar, location);
+      request.addParameter('email', TYPES.NVarChar, email);
+      request.addParameter('code', TYPES.NVarChar, code);
+      connection.execSql(request);
+    };
+
+    const checkBlocked = () => {
+      var request = new Request(
+        'SELECT Id FROM [BlockedLocations] WHERE Location = @location',
+        (err, rowCount) => {
+          if (err) {
+            console.error('request error:');
+            console.log(err);
+            fail('request error');
+            return;
+          }
+          if (rowCount > 0) {
+            fail('location blocked');
+            return;
+          }
+          checkTaken();
+        }
+      );
+
+      request.addParameter('location', TYPES.NVarChar, location);
+      connection.execSql(request);
+    };
+
     connection.on('connect', connErr => {
       if (connErr) {
         console.log(connErr);
-          connection.close();
-          callback({error: 'connection error'});
+        connection.close();
+        callback({ error: 'connection error' });
+        return;
+      }
+
+      if (location == null || location === '' || location === '-') {
+        runUpdate();
       } else {
-        // Read all rows from table
+        checkBlocked();
+      }
+    });
+
+    connection.connect();
+  }
+
+  getBlockedLocations(callback) {
+    var connection = azureSqlConnection.connect();
+
+    connection.on('connect', connErr => {
+      if (connErr) {
+        console.log(connErr);
+        connection.close();
+        callback({ error: 'connection error' });
+      } else {
         var request = new Request(
-          'UPDATE [Lanbooking] SET Location = @location WHERE Email = @email AND Code = @code',
-          (err, rowCount) => {
+          'SELECT Location FROM [BlockedLocations]',
+          (err, rowCount, rows) => {
             if (err) {
               console.error('request error:');
               console.log(err);
-                connection.close();
-                callback({error: 'request error'});
-                return;
-            }
-              console.log('rowcount r: ' + rowCount);
               connection.close();
-              if (rowCount === 0) {
-              callback({ error: 'no result' });
+              callback({ error: 'request error' });
+              return;
+            }
+
+            connection.close();
+            if (rowCount === 0) {
+              callback([]);
             } else {
-              callback(rowCount);
+              callback(rows.map(row => row[0].value));
             }
           }
         );
-
-        request.addParameter('email', TYPES.NVarChar, email);
-        request.addParameter('code', TYPES.NVarChar, code);
-        request.addParameter('location', TYPES.NVarChar, location);
-
-        console.log(request);
-
-        request.on('done', rowCount => {
-          console.log('req on done called');
-          console.log('rowcount: ' + rowCount);
-          callback(rowCount);
-        });
 
         connection.execSql(request);
       }

@@ -47,8 +47,8 @@ router
     console.log(req.body);
     if (req.body.email && req.body.code) {
       service.store(req.body.email, req.body.code, req.body.location, data => {
-        if (data === null) {
-          sendFailure('access denied', res);
+        if (data === null || data.error) {
+          sendFailure(data?.error || 'access denied', res);
         } else {
           console.log(data);
           res.json({
@@ -86,6 +86,15 @@ router
   .get('/tablegroups', (req, res) => {
     service.getAllTableGroups(data => {
       if (data.error) {
+        sendFailure('error in query', res);
+      } else {
+        res.json(data);
+      }
+    });
+  })
+  .get('/blocked', (req, res) => {
+    service.getBlockedLocations(data => {
+      if (data && data.error) {
         sendFailure('error in query', res);
       } else {
         res.json(data);

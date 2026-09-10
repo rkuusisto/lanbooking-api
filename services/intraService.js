@@ -5,6 +5,7 @@ const TABLES = {
   REGISTRATION: '[Lanregistration]',
   BOOKING: '[Lanbooking]',
   SETTINGS: '[LanSettings]',
+  BLOCKED: '[BlockedLocations]',
 };
 
 const field = (column, type, options = {}) => ({
@@ -62,6 +63,14 @@ const BOOKING_FIELDS = {
   done: field('Done', TYPES.Int),
 };
 
+const BLOCKED_FIELDS = {
+  location: field('Location', TYPES.NVarChar, { required: true }),
+  createdAt: field('CreatedAt', TYPES.DateTime, {
+    readOnly: true,
+    formatter: value => (value ? value.toISOString() : null),
+  }),
+};
+
 const SETTINGS_FIELDS = {
   total: field('Total', TYPES.Int, { required: true }),
   startDate: field('StartDate', TYPES.Date, {
@@ -89,6 +98,7 @@ const columnLookups = {
   registration: buildLookup(REGISTRATION_FIELDS),
   booking: buildLookup(BOOKING_FIELDS),
   settings: buildLookup(SETTINGS_FIELDS),
+  blocked: buildLookup(BLOCKED_FIELDS),
 };
 
 function buildLookup(map) {
@@ -415,12 +425,53 @@ async function getBookingById(id) {
   return entities[0] || null;
 }
 
+function normalizeLocation(value) {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed || trimmed === '-') {
+    return null;
+  }
+  return trimmed;
+}
+
+async function assertLocationAvailable(location, excludeBookingId) {
+  const normalized = normalizeLocation(location);
+  if (normalized === undefined || normalized === null) {
+    return;
+  }
+
+  const params = [
+    { name: 'location', type: TYPES.NVarChar, value: normalized },
+  ];
+  let query = `SELECT Id FROM ${TABLES.BOOKING} WHERE [Location] = @location`;
+  if (excludeBookingId) {
+    query += ' AND Id != @excludeId';
+    params.push({
+      name: 'excludeId',
+      type: TYPES.BigInt,
+      value: excludeBookingId,
+    });
+  }
+
+  const { rowCount } = await execute(query, params);
+  if (rowCount > 0) {
+    throw createHttpError(409, 'Location already booked');
+  }
+}
+
 async function createBooking(payload) {
   const data = {
     invitationSent: payload.invitationSent ?? false,
     done: payload.done ?? 0,
     ...payload,
   };
+
+  if (data.location !== undefined) {
+    data.location = normalizeLocation(data.location);
+    await assertLocationAvailable(data.location);
+  }
 
   ensureRequiredFields(data, BOOKING_FIELDS);
   const { columns, values, params } = buildInsertParts(data, BOOKING_FIELDS);
@@ -438,9 +489,66 @@ async function createBooking(payload) {
   return entities[0];
 }
 
+async function setBookingLocation(id, location) {
+  const safeId = ensureId(id);
+  const normalized = normalizeLocation(location);
+  const { rows, rowCount } = await execute(
+    `UPDATE ${TABLES.BOOKING} SET [Location] = @location OUTPUT INSERTED.* WHERE Id = @id`,
+    [
+      { name: 'location', type: TYPES.NVarChar, value: normalized },
+      { name: 'id', type: TYPES.BigInt, value: safeId },
+    ]
+  );
+  if (rowCount === 0) {
+    return null;
+  }
+  return serializeRows(rows, BOOKING_FIELDS, columnLookups.booking)[0];
+}
+
+async function swapBookingLocations(sourceId, targetLocation) {
+  const source = await getBookingById(sourceId);
+  if (!source) {
+    return null;
+  }
+
+  const target = normalizeLocation(targetLocation);
+  if (!target) {
+    throw createHttpError(400, 'Location is required');
+  }
+
+  if (normalizeLocation(source.location) === target) {
+    throw createHttpError(400, 'Cannot swap a booking with its own location');
+  }
+
+  const { rows } = await execute(
+    `SELECT * FROM ${TABLES.BOOKING} WHERE [Location] = @location AND Id != @id`,
+    [
+      { name: 'location', type: TYPES.NVarChar, value: target },
+      { name: 'id', type: TYPES.BigInt, value: ensureId(sourceId) },
+    ]
+  );
+  const occupants = serializeRows(rows, BOOKING_FIELDS, columnLookups.booking);
+  const occupant = occupants[0] || null;
+
+  if (!occupant) {
+    return { source: await setBookingLocation(sourceId, target), target: null };
+  }
+
+  const sourceOld = normalizeLocation(source.location);
+  await setBookingLocation(occupant.id, null);
+  const updatedSource = await setBookingLocation(sourceId, target);
+  const updatedOccupant = await setBookingLocation(occupant.id, sourceOld);
+  return { source: updatedSource, target: updatedOccupant };
+}
+
 async function updateBooking(id, payload) {
   const safeId = ensureId(id);
-  const { assignments, params } = buildUpdateParts(payload, BOOKING_FIELDS);
+  const data = { ...payload };
+  if (data.location !== undefined) {
+    data.location = normalizeLocation(data.location);
+    await assertLocationAvailable(data.location, safeId);
+  }
+  const { assignments, params } = buildUpdateParts(data, BOOKING_FIELDS);
 
   if (assignments.length === 0) {
     throw createHttpError(400, 'No fields provided for update');
@@ -460,6 +568,47 @@ async function updateBooking(id, payload) {
   }
 
   return serializeRows(rows, BOOKING_FIELDS, columnLookups.booking)[0];
+}
+
+async function getBlockedLocations() {
+  const { rows } = await execute(
+    `SELECT * FROM ${TABLES.BLOCKED} ORDER BY [Location]`
+  );
+  return serializeRows(rows, BLOCKED_FIELDS, columnLookups.blocked);
+}
+
+async function createBlockedLocation(payload) {
+  const location = normalizeLocation(payload?.location);
+  if (!location) {
+    throw createHttpError(400, 'Location is required');
+  }
+
+  const existing = await execute(
+    `SELECT Id FROM ${TABLES.BLOCKED} WHERE [Location] = @location`,
+    [{ name: 'location', type: TYPES.NVarChar, value: location }]
+  );
+  if (existing.rowCount > 0) {
+    throw createHttpError(409, 'Location is already blocked');
+  }
+
+  const query = `INSERT INTO ${TABLES.BLOCKED} ([Location]) OUTPUT INSERTED.* VALUES (@location);`;
+  const { rows } = await execute(query, [
+    { name: 'location', type: TYPES.NVarChar, value: location },
+  ]);
+  return serializeRows(rows, BLOCKED_FIELDS, columnLookups.blocked)[0];
+}
+
+async function deleteBlockedLocation(location) {
+  const normalized = normalizeLocation(location);
+  if (!normalized) {
+    throw createHttpError(400, 'Location is required');
+  }
+
+  const { rowCount } = await execute(
+    `DELETE FROM ${TABLES.BLOCKED} OUTPUT DELETED.Id WHERE [Location] = @location`,
+    [{ name: 'location', type: TYPES.NVarChar, value: normalized }]
+  );
+  return rowCount > 0;
 }
 
 async function deleteBooking(id) {
@@ -560,7 +709,11 @@ export default {
   getBookingById,
   createBooking,
   updateBooking,
+  swapBookingLocations,
   deleteBooking,
+  getBlockedLocations,
+  createBlockedLocation,
+  deleteBlockedLocation,
   getSettings,
   getSettingById,
   getLatestSetting,
