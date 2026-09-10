@@ -248,7 +248,7 @@ export async function getUserBySteamId(steamId) {
   // Use shared request pool with semaphore-based rate limiting
   return await requestPool.execute(async () => {
     try {
-      const url = new URL('/ISteamUser/GetPlayerSummaries/v0002/', STEAM_API_BASE_URL);
+      const url = new URL('/ISteamUser/GetPlayerSummaries/v2/', STEAM_API_BASE_URL);
       url.searchParams.append('key', apiKey);
       url.searchParams.append('steamids', trimmedSteamId);
 
